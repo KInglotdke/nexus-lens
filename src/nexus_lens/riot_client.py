@@ -7,7 +7,7 @@ from urllib.parse import quote
 import httpx
 
 from nexus_lens.config import Settings
-from nexus_lens.schemas import RiotAccount, RiotMatch
+from nexus_lens.schemas import RANKED_SOLO_QUEUE_ID, RiotAccount, RiotMatch
 
 
 class RiotApiError(RuntimeError):
@@ -64,7 +64,11 @@ class RiotClient:
     ) -> list[str]:
         payload = await self._get(
             f"/lol/match/v5/matches/by-puuid/{quote(puuid, safe='')}/ids",
-            params={"start": start, "count": count},
+            params={
+                "start": start,
+                "count": count,
+                "queue": RANKED_SOLO_QUEUE_ID,
+            },
         )
         if not isinstance(payload, list) or not all(
             isinstance(item, str) for item in payload

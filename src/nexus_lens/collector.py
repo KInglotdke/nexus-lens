@@ -1,13 +1,20 @@
 """Orchestration and raw snapshot persistence for Stage 0."""
 
 import json
+import logging
 import re
 from datetime import UTC, datetime
 from pathlib import Path
 
 from nexus_lens.config import Settings
 from nexus_lens.riot_client import RiotClient
-from nexus_lens.schemas import CollectionManifest
+from nexus_lens.schemas import (
+    RANKED_SOLO_QUEUE_ID,
+    CollectionManifest,
+    SkippedMatch,
+)
+
+logger = logging.getLogger(__name__)
 
 
 class FeasibilityCollector:
@@ -35,24 +42,45 @@ class FeasibilityCollector:
         matches_dir = snapshot_dir / "matches"
         matches_dir.mkdir(parents=True, exist_ok=False)
 
+        accepted_match_ids: list[str] = []
         match_files: list[Path] = []
+        skipped_matches: list[SkippedMatch] = []
         for match_id in match_ids:
             match = await self._client.get_match(match_id)
+            if match.info.queueId != RANKED_SOLO_QUEUE_ID:
+                reason = (
+                    f"expected queueId {RANKED_SOLO_QUEUE_ID}, "
+                    f"got {match.info.queueId}"
+                )
+                logger.warning("Skipping match %s: %s", match_id, reason)
+                skipped_matches.append(
+                    SkippedMatch(
+                        match_id=match_id,
+                        queue_id=match.info.queueId,
+                        reason=reason,
+                    )
+                )
+                continue
+
             filename = f"{_safe_filename(match_id)}.json"
             relative_path = Path("matches") / filename
             _write_json(
                 snapshot_dir / relative_path,
                 match.model_dump(mode="json", by_alias=True),
             )
+            accepted_match_ids.append(match_id)
             match_files.append(relative_path)
 
         manifest = CollectionManifest(
             collected_at=collected_at,
             routing_region=self._settings.routing_region,
             account=account,
+            queue_id=RANKED_SOLO_QUEUE_ID,
             requested_match_count=requested_count,
             match_ids=match_ids,
+            accepted_match_ids=accepted_match_ids,
             match_files=match_files,
+            skipped_matches=skipped_matches,
         )
         _write_json(
             snapshot_dir / "manifest.json",

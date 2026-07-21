@@ -41,7 +41,7 @@ async def test_resolves_account_and_sends_api_key() -> None:
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_requests_match_ids_with_pagination() -> None:
+async def test_requests_ranked_solo_match_ids_with_pagination() -> None:
     route = respx.get(
         "https://europe.api.riotgames.com/lol/match/v5/matches/"
         "by-puuid/example-puuid/ids"
@@ -53,7 +53,11 @@ async def test_requests_match_ids_with_pagination() -> None:
         )
 
     assert match_ids == ["EUW1_1", "EUW1_2"]
-    assert dict(route.calls.last.request.url.params) == {"start": "10", "count": "2"}
+    assert dict(route.calls.last.request.url.params) == {
+        "start": "10",
+        "count": "2",
+        "queue": "420",
+    }
 
 
 @pytest.mark.asyncio

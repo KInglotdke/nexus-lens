@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nexus-lens"
 version = "0.1.0"
-description = "Stage 0 feasibility prototype for Nexus Lens"
+description = "Stage 1 data feasibility pipeline for Nexus Lens"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
