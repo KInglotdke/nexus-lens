@@ -1,8 +1,8 @@
 """Pure transformation of validated Match-V5 payloads into Stage 1 records."""
 
-import re
 from datetime import UTC, datetime
 
+from nexus_lens.patches import resolve_patch
 from nexus_lens.schemas import (
     RANKED_SOLO_QUEUE_ID,
     MatchParticipant,
@@ -17,9 +17,6 @@ from nexus_lens.schemas import (
 
 EXPECTED_PARTICIPANTS = 10
 EXPECTED_TEAMS = 2
-UNKNOWN_PATCH = "unknown"
-
-_PATCH_PATTERN = re.compile(r"(?:^|\D)(\d+)\.(\d+)(?:\D|$)")
 _POSITION_ALIASES = {
     "TOP": "TOP",
     "JUNGLE": "JUNGLE",
@@ -38,17 +35,6 @@ class NormalizationError(ValueError):
     def __init__(self, code: str, message: str) -> None:
         self.code = code
         super().__init__(message)
-
-
-def extract_patch(game_version: str | None) -> str:
-    """Return a deterministic major.minor patch or ``unknown``."""
-
-    if not game_version:
-        return UNKNOWN_PATCH
-    match = _PATCH_PATTERN.search(game_version)
-    if match is None:
-        return UNKNOWN_PATCH
-    return f"{int(match.group(1))}.{int(match.group(2))}"
 
 
 def normalize_position(position: str | None) -> str | None:
@@ -83,15 +69,20 @@ def normalize_match(raw_match: RiotMatch) -> NormalizedBatch:
 
     match_id = raw_match.metadata.matchId
     team_kills = _team_kill_totals(info.teams, info.participants)
+    game_creation = _from_milliseconds(info.gameCreation)
+    patch = resolve_patch(info.gameVersion, game_creation)
     match_record = NormalizedMatch(
         match_id=match_id,
         data_version=raw_match.metadata.dataVersion,
-        game_creation=_from_milliseconds(info.gameCreation),
+        game_creation=game_creation,
         game_start=_optional_timestamp(info.gameStartTimestamp),
         game_end=_optional_timestamp(info.gameEndTimestamp),
         game_duration_seconds=info.gameDuration,
-        game_version=info.gameVersion,
-        patch=extract_patch(info.gameVersion),
+        api_game_version=patch.api_game_version,
+        api_patch=patch.api_patch,
+        public_patch=patch.public_patch,
+        patch_resolution_method=patch.method,
+        patch_resolution_status=patch.status,
         queue_id=info.queueId,
         game_mode=info.gameMode,
         game_type=info.gameType,

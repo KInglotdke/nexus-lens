@@ -75,9 +75,9 @@ def make_match_payload(
             "participants": [item["puuid"] for item in participants],
         },
         "info": {
-            "gameCreation": 1_750_000_000_000,
-            "gameStartTimestamp": 1_750_000_010_000,
-            "gameEndTimestamp": 1_750_001_810_000,
+            "gameCreation": 1_781_000_000_000,
+            "gameStartTimestamp": 1_781_000_010_000,
+            "gameEndTimestamp": 1_781_001_810_000,
             "gameDuration": 1_800,
             "gameVersion": game_version,
             "queueId": queue_id,

@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     riot_api_key: str = Field(min_length=1)
     routing_region: str = "europe"
+    platform_region: str = "eun1"
     game_name: str = Field(min_length=1)
     tag_line: str = Field(min_length=1)
     match_count: int = Field(default=5, ge=1, le=100)

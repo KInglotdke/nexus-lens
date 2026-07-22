@@ -164,8 +164,11 @@ class NormalizedMatch(BaseModel):
     game_start: datetime | None
     game_end: datetime | None
     game_duration_seconds: int
-    game_version: str | None
-    patch: str
+    api_game_version: str | None
+    api_patch: str | None
+    public_patch: str | None
+    patch_resolution_method: str
+    patch_resolution_status: str
     queue_id: int
     game_mode: str | None
     game_type: str | None
@@ -241,6 +244,22 @@ class NormalizedBatch(BaseModel):
     match: NormalizedMatch
     participants: list[NormalizedParticipant]
     teams: list[NormalizedTeam]
+
+
+class LeagueEntry(RiotModel):
+    """Minimal League-V4 entry used for privacy-conscious discovery."""
+
+    puuid: str | None = None
+    summonerId: str | None = None
+    tier: str | None = None
+    rank: str | None = None
+    queueType: str | None = None
+
+
+class SummonerRecord(RiotModel):
+    """Minimal Summoner-V4 response used only to resolve PUUID internally."""
+
+    puuid: str
 
 
 JsonObject = dict[str, Any]

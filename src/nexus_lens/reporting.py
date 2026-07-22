@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from nexus_lens.catalog import ProcessingCatalog
+from nexus_lens.patches import resolve_legacy_match_record
 from nexus_lens.processing import ProcessingSummary
 from nexus_lens.storage import iter_json_records
 
@@ -25,21 +26,44 @@ def build_feasibility_report(
     """Aggregate normalized data without returning participant identifiers."""
 
     processed_match_ids = catalog.processed_match_ids()
-    matches = [
-        record
+    match_candidates = [
+        resolve_legacy_match_record(record)
         for record in iter_json_records(processed_root, "matches")
         if str(record.get("match_id")) in processed_match_ids
     ]
-    participants = [
+    matches_by_id: dict[str, dict[str, Any]] = {}
+    for record in match_candidates:
+        match_id = str(record.get("match_id"))
+        current = matches_by_id.get(match_id)
+        if current is None or (
+            current.get("patch_resolution_status") != "resolved"
+            and record.get("patch_resolution_status") == "resolved"
+        ):
+            matches_by_id[match_id] = record
+    matches = list(matches_by_id.values())
+
+    participant_candidates = [
         record
         for record in iter_json_records(processed_root, "participants")
         if str(record.get("match_id")) in processed_match_ids
     ]
-    teams = [
+    participants = list(
+        {
+            (str(record.get("match_id")), record.get("participant_id")): record
+            for record in participant_candidates
+        }.values()
+    )
+    team_candidates = [
         record
         for record in iter_json_records(processed_root, "teams")
         if str(record.get("match_id")) in processed_match_ids
     ]
+    teams = list(
+        {
+            (str(record.get("match_id")), record.get("team_id")): record
+            for record in team_candidates
+        }.values()
+    )
 
     match_ids = [str(match["match_id"]) for match in matches]
     participant_groups: dict[tuple[str, int | None], list[dict[str, Any]]] = (
@@ -141,12 +165,44 @@ def build_feasibility_report(
             "teams": len(teams),
         },
         "queue_ids": sorted({match.get("queue_id") for match in matches}),
-        "patches": sorted({str(match.get("patch")) for match in matches}),
-        "game_versions": sorted(
+        "public_patches": sorted(
             {
-                str(match["game_version"])
+                str(match["public_patch"])
                 for match in matches
-                if match.get("game_version") is not None
+                if match.get("public_patch") is not None
+            }
+        ),
+        "unresolved_patch_matches": sum(
+            match.get("patch_resolution_status") != "resolved" for match in matches
+        ),
+        "patch_resolution_statuses": dict(
+            sorted(
+                Counter(
+                    str(match.get("patch_resolution_status") or "missing")
+                    for match in matches
+                ).items()
+            )
+        ),
+        "patch_resolution_methods": dict(
+            sorted(
+                Counter(
+                    str(match.get("patch_resolution_method") or "missing")
+                    for match in matches
+                ).items()
+            )
+        ),
+        "api_patches": sorted(
+            {
+                str(match["api_patch"])
+                for match in matches
+                if match.get("api_patch") is not None
+            }
+        ),
+        "api_game_versions": sorted(
+            {
+                str(match["api_game_version"])
+                for match in matches
+                if match.get("api_game_version") is not None
             }
         ),
         "date_range_utc": {
@@ -184,7 +240,14 @@ def build_feasibility_report(
         "missingness": {
             "matches": _missingness(
                 matches,
-                ("game_start", "game_end", "game_version", "platform_id"),
+                (
+                    "game_start",
+                    "game_end",
+                    "api_game_version",
+                    "api_patch",
+                    "public_patch",
+                    "platform_id",
+                ),
             ),
             "participants": _missingness(
                 participants,
@@ -260,7 +323,7 @@ def _render_markdown(report: dict[str, Any]) -> str:
     positions = report["position_completeness"]
     duration = report["duration_seconds"]
     lines = [
-        "# Nexus Lens Stage 1 feasibility report",
+        "# Nexus Lens feasibility report",
         "",
         f"> {report['sample_warning']}" if report["sample_warning"] else "",
         "",
@@ -270,8 +333,13 @@ def _render_markdown(report: dict[str, Any]) -> str:
         f"- Participants: {counts['participants']}",
         f"- Teams: {counts['teams']}",
         f"- Queue IDs: {_join(report['queue_ids'])}",
-        f"- Patches: {_join(report['patches'])}",
-        f"- Complete game versions: {_join(report['game_versions'])}",
+        f"- Public patches (canonical): {_join(report['public_patches'])}",
+        f"- API patches (internal): {_join(report['api_patches'])}",
+        f"- Complete API game versions: {_join(report['api_game_versions'])}",
+        f"- Matches with unresolved public patch: "
+        f"{report['unresolved_patch_matches']}",
+        f"- Patch resolution statuses: {report['patch_resolution_statuses']}",
+        f"- Patch resolution methods: {report['patch_resolution_methods']}",
         f"- UTC date range: {report['date_range_utc']['start']} to "
         f"{report['date_range_utc']['end']}",
         "",

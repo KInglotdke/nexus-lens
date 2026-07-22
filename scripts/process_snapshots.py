@@ -60,6 +60,14 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Report directory (default: <processed-dir>/reports).",
     )
+    parser.add_argument(
+        "--migrate-stage1",
+        action="store_true",
+        help=(
+            "Re-normalize legacy catalog entries from immutable raw snapshots "
+            "using public-patch fields; legacy derived files remain compatible."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -81,6 +89,7 @@ def main() -> int:
         summary = SnapshotProcessor(
             processed_root=args.processed_dir,
             catalog=catalog,
+            migrate_stage1=args.migrate_stage1,
         ).process(snapshots)
         if args.report != "none":
             formats = (
@@ -98,7 +107,7 @@ def main() -> int:
 
 
 def _print_summary(summary: dict[str, object]) -> None:
-    print("Nexus Lens Stage 1 processing summary")
+    print("Nexus Lens snapshot processing summary")
     print(f"  snapshots examined: {summary['snapshots_examined']}")
     print(f"  matches discovered: {summary['matches_discovered']}")
     print(f"  newly processed: {summary['newly_processed_matches']}")
@@ -106,9 +115,9 @@ def _print_summary(summary: dict[str, object]) -> None:
     print(f"  rejected: {summary['rejected_matches']}")
     print(f"  participant rows written: {summary['participant_rows_written']}")
     print(f"  team rows written: {summary['team_rows_written']}")
-    patches = summary["patches_encountered"] or []
+    patches = summary["public_patches_encountered"] or []
     patch_summary = ", ".join(str(item) for item in patches) or "none"
-    print(f"  patches encountered: {patch_summary}")
+    print(f"  public patches encountered: {patch_summary}")
     print(f"  elapsed seconds: {summary['elapsed_seconds']}")
     failures = summary["failure_reasons"] or {}
     if isinstance(failures, dict) and failures:

@@ -1,3 +1,4 @@
+import sqlite3
 from pathlib import Path
 
 from nexus_lens.catalog import ProcessingCatalog
@@ -105,13 +106,76 @@ def test_catalog_match_id_is_unique(tmp_path: Path) -> None:
         details = {
             "match_id": "TEST_UNIQUE",
             "routing_region": "test-region",
-            "patch": "16.12",
+            "api_game_version": "16.12.788.4269",
+            "api_patch": "16.12",
+            "public_patch": "26.12",
+            "patch_resolution_method": "test-rule",
+            "patch_resolution_status": "resolved",
             "queue_id": 420,
             "source_snapshot": "snapshot-a",
         }
         catalog.record_processed(**details)
         catalog.record_processed(**{**details, "source_snapshot": "snapshot-b"})
         assert catalog.stats()["total_entries"] == 1
+
+
+def test_legacy_catalog_entry_can_be_migrated_from_raw(tmp_path: Path) -> None:
+    catalog_path = tmp_path / "processed" / "catalog.sqlite3"
+    catalog_path.parent.mkdir(parents=True)
+    connection = sqlite3.connect(catalog_path)
+    connection.execute(
+        """
+        CREATE TABLE processed_matches (
+            match_id TEXT PRIMARY KEY,
+            routing_region TEXT NOT NULL,
+            patch TEXT,
+            queue_id INTEGER,
+            source_snapshot TEXT NOT NULL,
+            processing_timestamp TEXT NOT NULL,
+            status TEXT NOT NULL,
+            failure_code TEXT,
+            failure_reason TEXT
+        )
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO processed_matches VALUES (
+            'TEST_LEGACY', 'test-region', '16.14', 420, 'old',
+            '2026-01-01T00:00:00Z', 'processed', NULL, NULL
+        )
+        """
+    )
+    connection.commit()
+    connection.close()
+    snapshot = write_snapshot(
+        tmp_path / "raw",
+        "20260701T000000000000Z",
+        [
+            make_match_payload(
+                match_id="TEST_LEGACY",
+                game_version="16.14.792.1234",
+            )
+        ],
+    )
+
+    with ProcessingCatalog(catalog_path) as catalog:
+        assert catalog.needs_patch_migration("TEST_LEGACY") is True
+        summary = SnapshotProcessor(
+            processed_root=tmp_path / "processed",
+            catalog=catalog,
+            migrate_stage1=True,
+        ).process([snapshot])
+        assert summary.newly_processed_matches == 1
+        assert catalog.needs_patch_migration("TEST_LEGACY") is False
+        assert catalog.processed_public_patch("TEST_LEGACY") == "26.14"
+
+    files = list(
+        (tmp_path / "processed").glob(
+            "region=test-region/patch=26.14/queue=420/matches/*.json"
+        )
+    )
+    assert len(files) == 1
 
 
 def test_report_integrity_and_privacy(tmp_path: Path) -> None:
@@ -136,6 +200,9 @@ def test_report_integrity_and_privacy(tmp_path: Path) -> None:
 
         assert report["counts"] == {"matches": 1, "participants": 10, "teams": 2}
         assert report["queue_ids"] == [420]
+        assert report["public_patches"] == ["26.12"]
+        assert report["api_patches"] == ["16.12"]
+        assert report["api_game_versions"] == ["16.12.788.4269"]
         assert report["shape_checks"]["duplicate_match_records"] == 0
         assert report["shape_checks"]["teams_with_one_of_each_position"] == 2
         assert report["win_loss_checks"][
@@ -151,5 +218,6 @@ def test_report_integrity_and_privacy(tmp_path: Path) -> None:
             assert "TEST_REPORT" not in report_content
             assert "puuid" not in report_content.lower()
             assert "summoner" not in report_content.lower()
+        assert "Public patches (canonical): 26.12" in content
     finally:
         catalog.close()

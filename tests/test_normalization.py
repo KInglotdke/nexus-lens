@@ -4,26 +4,11 @@ import pytest
 
 from nexus_lens.normalization import (
     NormalizationError,
-    extract_patch,
     normalize_match,
     normalize_position,
 )
 from nexus_lens.schemas import RiotMatch
 from tests.factories import make_match_payload
-
-
-@pytest.mark.parametrize(
-    ("version", "expected"),
-    [
-        ("16.12.788.4269", "16.12"),
-        ("15.3.123.1", "15.3"),
-        ("v14.24-release", "14.24"),
-        ("unparseable", "unknown"),
-        (None, "unknown"),
-    ],
-)
-def test_patch_extraction(version: str | None, expected: str) -> None:
-    assert extract_patch(version) == expected
 
 
 def test_queue_420_is_accepted_and_non_420_is_rejected() -> None:
@@ -97,7 +82,10 @@ def test_participant_derivations_and_team_normalization() -> None:
     participant = batch.participants[0]
     team = batch.teams[0]
 
-    assert batch.match.patch == "16.12"
+    assert batch.match.api_game_version == "16.12.788.4269"
+    assert batch.match.api_patch == "16.12"
+    assert batch.match.public_patch == "26.12"
+    assert batch.match.patch_resolution_status == "resolved"
     assert len(batch.participants) == 10
     assert len(batch.teams) == 2
     assert participant.kda == 3.0

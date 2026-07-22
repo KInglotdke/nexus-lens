@@ -23,7 +23,7 @@ def write_normalized_batch(
     partition = (
         processed_root
         / f"region={_safe(routing_region)}"
-        / f"patch={_safe(batch.match.patch)}"
+        / f"patch={_safe(batch.match.public_patch or 'unresolved')}"
         / f"queue={batch.match.queue_id}"
     )
     filename = f"{_safe(batch.match.match_id)}"

@@ -16,6 +16,7 @@ class ProcessingCatalog:
         self._connection.row_factory = sqlite3.Row
         self._connection.execute("PRAGMA foreign_keys = ON")
         self._create_schema()
+        self._migrate_schema()
 
     def __enter__(self) -> "ProcessingCatalog":
         return self
@@ -67,7 +68,11 @@ class ProcessingCatalog:
         *,
         match_id: str,
         routing_region: str,
-        patch: str,
+        api_game_version: str | None,
+        api_patch: str | None,
+        public_patch: str | None,
+        patch_resolution_method: str,
+        patch_resolution_status: str,
         queue_id: int,
         source_snapshot: str,
     ) -> None:
@@ -75,12 +80,19 @@ class ProcessingCatalog:
             self._connection.execute(
                 """
                 INSERT INTO processed_matches (
-                    match_id, routing_region, patch, queue_id, source_snapshot,
-                    processing_timestamp, status, failure_code, failure_reason
-                ) VALUES (?, ?, ?, ?, ?, ?, 'processed', NULL, NULL)
+                    match_id, routing_region, patch, api_game_version, api_patch,
+                    public_patch, patch_resolution_method, patch_resolution_status,
+                    queue_id, source_snapshot, processing_timestamp, status,
+                    failure_code, failure_reason
+                ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'processed', NULL, NULL)
                 ON CONFLICT(match_id) DO UPDATE SET
                     routing_region = excluded.routing_region,
-                    patch = excluded.patch,
+                    patch = NULL,
+                    api_game_version = excluded.api_game_version,
+                    api_patch = excluded.api_patch,
+                    public_patch = excluded.public_patch,
+                    patch_resolution_method = excluded.patch_resolution_method,
+                    patch_resolution_status = excluded.patch_resolution_status,
                     queue_id = excluded.queue_id,
                     source_snapshot = excluded.source_snapshot,
                     processing_timestamp = excluded.processing_timestamp,
@@ -91,7 +103,11 @@ class ProcessingCatalog:
                 (
                     match_id,
                     routing_region,
-                    patch,
+                    api_game_version,
+                    api_patch,
+                    public_patch,
+                    patch_resolution_method,
+                    patch_resolution_status,
                     queue_id,
                     source_snapshot,
                     _utc_now(),
@@ -107,17 +123,29 @@ class ProcessingCatalog:
         queue_id: int | None,
         failure_code: str,
         failure_reason: str,
+        api_game_version: str | None = None,
+        api_patch: str | None = None,
+        public_patch: str | None = None,
+        patch_resolution_method: str | None = None,
+        patch_resolution_status: str | None = None,
     ) -> None:
         with self._connection:
             self._connection.execute(
                 """
                 INSERT INTO processed_matches (
-                    match_id, routing_region, patch, queue_id, source_snapshot,
-                    processing_timestamp, status, failure_code, failure_reason
-                ) VALUES (?, ?, NULL, ?, ?, ?, 'rejected', ?, ?)
+                    match_id, routing_region, patch, api_game_version, api_patch,
+                    public_patch, patch_resolution_method, patch_resolution_status,
+                    queue_id, source_snapshot, processing_timestamp, status,
+                    failure_code, failure_reason
+                ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, 'rejected', ?, ?)
                 ON CONFLICT(match_id) DO UPDATE SET
                     routing_region = excluded.routing_region,
                     patch = NULL,
+                    api_game_version = excluded.api_game_version,
+                    api_patch = excluded.api_patch,
+                    public_patch = excluded.public_patch,
+                    patch_resolution_method = excluded.patch_resolution_method,
+                    patch_resolution_status = excluded.patch_resolution_status,
                     queue_id = excluded.queue_id,
                     source_snapshot = excluded.source_snapshot,
                     processing_timestamp = excluded.processing_timestamp,
@@ -129,6 +157,11 @@ class ProcessingCatalog:
                 (
                     match_id,
                     routing_region,
+                    api_game_version,
+                    api_patch,
+                    public_patch,
+                    patch_resolution_method,
+                    patch_resolution_status,
                     queue_id,
                     source_snapshot,
                     _utc_now(),
@@ -136,6 +169,19 @@ class ProcessingCatalog:
                     failure_reason,
                 ),
             )
+
+    def match_observation(self, match_id: str) -> dict[str, Any] | None:
+        """Return cached terminal metadata without exposing it in reports."""
+
+        row = self._connection.execute(
+            """
+            SELECT status, failure_code, api_patch, public_patch,
+                   patch_resolution_status, queue_id, source_snapshot
+            FROM processed_matches WHERE match_id = ?
+            """,
+            (match_id,),
+        ).fetchone()
+        return dict(row) if row is not None else None
 
     def stats(self) -> dict[str, Any]:
         status_rows = self._connection.execute(
@@ -168,6 +214,30 @@ class ProcessingCatalog:
         ).fetchall()
         return {str(row["match_id"]) for row in rows}
 
+    def processed_public_patch(self, match_id: str) -> str | None:
+        row = self._connection.execute(
+            """
+            SELECT public_patch FROM processed_matches
+            WHERE match_id = ? AND status = 'processed'
+            """,
+            (match_id,),
+        ).fetchone()
+        return str(row["public_patch"]) if row and row["public_patch"] else None
+
+    def needs_patch_migration(self, match_id: str) -> bool:
+        row = self._connection.execute(
+            """
+            SELECT status, patch_resolution_status
+            FROM processed_matches WHERE match_id = ?
+            """,
+            (match_id,),
+        ).fetchone()
+        return bool(
+            row
+            and row["status"] == "processed"
+            and row["patch_resolution_status"] in (None, "legacy_unresolved")
+        )
+
     def _create_schema(self) -> None:
         with self._connection:
             self._connection.execute(
@@ -176,6 +246,11 @@ class ProcessingCatalog:
                     match_id TEXT PRIMARY KEY,
                     routing_region TEXT NOT NULL,
                     patch TEXT,
+                    api_game_version TEXT,
+                    api_patch TEXT,
+                    public_patch TEXT,
+                    patch_resolution_method TEXT,
+                    patch_resolution_status TEXT,
                     queue_id INTEGER,
                     source_snapshot TEXT NOT NULL,
                     processing_timestamp TEXT NOT NULL,
@@ -185,6 +260,40 @@ class ProcessingCatalog:
                     failure_code TEXT,
                     failure_reason TEXT
                 )
+                """
+            )
+
+    def _migrate_schema(self) -> None:
+        existing = {
+            row["name"]
+            for row in self._connection.execute(
+                "PRAGMA table_info(processed_matches)"
+            ).fetchall()
+        }
+        additions = {
+            "api_game_version": "TEXT",
+            "api_patch": "TEXT",
+            "public_patch": "TEXT",
+            "patch_resolution_method": "TEXT",
+            "patch_resolution_status": "TEXT",
+        }
+        with self._connection:
+            for name, sql_type in additions.items():
+                if name not in existing:
+                    self._connection.execute(
+                        f"ALTER TABLE processed_matches ADD COLUMN {name} {sql_type}"
+                    )
+            self._connection.execute(
+                """
+                UPDATE processed_matches
+                SET api_patch = COALESCE(api_patch, patch),
+                    patch_resolution_method = COALESCE(
+                        patch_resolution_method, 'stage1_legacy'
+                    ),
+                    patch_resolution_status = COALESCE(
+                        patch_resolution_status, 'legacy_unresolved'
+                    )
+                WHERE patch IS NOT NULL
                 """
             )
             self._connection.execute(

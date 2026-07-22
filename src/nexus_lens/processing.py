@@ -24,7 +24,7 @@ class ProcessingSummary:
     rejected_matches: int = 0
     participant_rows_written: int = 0
     team_rows_written: int = 0
-    patches_encountered: set[str] = field(default_factory=set)
+    public_patches_encountered: set[str] = field(default_factory=set)
     failure_reasons: Counter[str] = field(default_factory=Counter)
     elapsed_seconds: float = 0.0
 
@@ -37,7 +37,9 @@ class ProcessingSummary:
             "rejected_matches": self.rejected_matches,
             "participant_rows_written": self.participant_rows_written,
             "team_rows_written": self.team_rows_written,
-            "patches_encountered": sorted(self.patches_encountered),
+            "public_patches_encountered": sorted(
+                self.public_patches_encountered
+            ),
             "elapsed_seconds": round(self.elapsed_seconds, 6),
             "failure_reasons": dict(sorted(self.failure_reasons.items())),
         }
@@ -51,9 +53,11 @@ class SnapshotProcessor:
         *,
         processed_root: Path,
         catalog: ProcessingCatalog,
+        migrate_stage1: bool = False,
     ) -> None:
         self._processed_root = processed_root
         self._catalog = catalog
+        self._migrate_stage1 = migrate_stage1
 
     def process(self, snapshot_dirs: list[Path]) -> ProcessingSummary:
         summary = ProcessingSummary()
@@ -119,7 +123,9 @@ class SnapshotProcessor:
         match_id = str(metadata.get("matchId") or fallback_match_id)
         queue_value = info.get("queueId")
         queue_id = queue_value if isinstance(queue_value, int) else None
-        if self._catalog.is_processed(match_id):
+        if self._catalog.is_processed(match_id) and not (
+            self._migrate_stage1 and self._catalog.needs_patch_migration(match_id)
+        ):
             summary.already_processed_matches += 1
             return
 
@@ -170,14 +176,20 @@ class SnapshotProcessor:
         self._catalog.record_processed(
             match_id=match_id,
             routing_region=routing_region,
-            patch=batch.match.patch,
+            api_game_version=batch.match.api_game_version,
+            api_patch=batch.match.api_patch,
+            public_patch=batch.match.public_patch,
+            patch_resolution_method=batch.match.patch_resolution_method,
+            patch_resolution_status=batch.match.patch_resolution_status,
             queue_id=batch.match.queue_id,
             source_snapshot=source_snapshot,
         )
         summary.newly_processed_matches += 1
         summary.participant_rows_written += len(batch.participants)
         summary.team_rows_written += len(batch.teams)
-        summary.patches_encountered.add(batch.match.patch)
+        summary.public_patches_encountered.add(
+            batch.match.public_patch or "unresolved"
+        )
 
     def _reject(
         self,
