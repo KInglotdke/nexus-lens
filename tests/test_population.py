@@ -214,6 +214,47 @@ async def test_overlapping_histories_download_match_once(tmp_path: Path) -> None
 
 
 @pytest.mark.asyncio
+async def test_future_checkpoint_preserves_observed_seed_lineage(
+    tmp_path: Path,
+) -> None:
+    config = make_config(target_matches=1)
+    client = StubPopulationClient()
+    client.entries[("GOLD", "I", 1)] = [
+        LeagueEntry(
+            puuid="player-a",
+            tier="GOLD",
+            rank="I",
+            queueType="RANKED_SOLO_5x5",
+        )
+    ]
+    client.histories["player-a"] = ["TARGET"]
+    client.matches["TARGET"] = RiotMatch.model_validate(
+        make_match_payload(match_id="TARGET", game_version="16.14.1.1")
+    )
+    state = make_state(tmp_path, config)
+    with ProcessingCatalog(tmp_path / "processed" / "catalog.sqlite3") as catalog:
+        await make_collector(tmp_path, config, client, catalog, state).collect()
+
+    player = state.players["player-a"]
+    source = state.matches["TARGET"]["sources"][0]
+    assert state.payload["version"] == 4
+    assert state.payload["lineage_preservation_enabled"] is True
+    assert (
+        player["collection_contexts"][0]["collection_context_status"]
+        == "collection_context"
+    )
+    assert player["rank_observations"][0]["rank_status"] == "observed"
+    assert player["rank_observations"][0]["rank_observed_at_status"] == "observed"
+    assert source["platform_id"] == "eun1"
+    assert source["regional_routing"] == "europe"
+    assert source["analysis_region"] == "eune"
+    assert source["collection_stratum"] == "GOLD I"
+    assert source["seed_rank_status"] == "observed"
+    assert source["discovery_timestamp_status"] == "observed"
+    assert source["seed_player_key"] != "player-a"
+
+
+@pytest.mark.asyncio
 async def test_existing_catalog_target_match_needs_no_download(tmp_path: Path) -> None:
     config = make_config(target_matches=1)
     client = StubPopulationClient()

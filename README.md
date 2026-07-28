@@ -1,9 +1,9 @@
 # Nexus Lens
 
-Nexus Lens is a privacy-conscious, patch-aware League of Legends data feasibility
-pipeline. It collects only Ranked Solo/Duo (`queueId=420`), keeps raw responses
-immutable, normalizes analysis-ready records, and supports bounded population
-sampling through official Riot APIs.
+Nexus Lens is a privacy-conscious, patch-aware foundation for a League of Legends
+champion-select recommendation system. It collects only Ranked Solo/Duo
+(`queueId=420`), keeps raw responses immutable, and builds reproducible observations
+for future matchup, ally-synergy, and team-composition reasoning.
 
 It does not contain recommendation logic, professional esports data, a production
 service, scheduled collection, or a UI.
@@ -100,6 +100,282 @@ data/processed/
 JSONL keeps dependencies small for feasibility-scale data. Parquet remains the
 planned migration once population-scale analytical scans justify it.
 
+## Stage 3.1: canonical analysis tables
+
+Stage 3.1 is an offline, deterministic transformation of the completed Stage 2
+population. It accepts only the checkpoint-approved 100-match set, cross-checks the
+manifest, read-only catalog, actual-patch normalized partition, and retained raw
+payload for every match, then creates four canonical JSONL tables plus metadata and
+an aggregate quality report. It never calls Riot or loads `.env`.
+
+Validate the retained inputs and transformed rows without writing anything:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_canonical_tables.py --manifest data/raw/20260722T125547567196Z-population/manifest.json --validate-only
+```
+
+Publish the canonical dataset:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_canonical_tables.py --manifest data/raw/20260722T125547567196Z-population/manifest.json
+```
+
+If `--manifest` is omitted, the command selects the newest completed population
+manifest that has exactly 100 accepted matches with the required 26.14/26.13 patch
+split. `--checkpoint` is normally derived from the manifest run ID. Output is kept
+separate under:
+
+```text
+data/processed/stage3/schema=stage3.1-v1/run=<stage-2-run-id>/
+  matches.jsonl
+  participants.jsonl
+  teams.jsonl
+  bans.jsonl
+  metadata.json
+  quality_report.json
+```
+
+Rows and columns are sorted deterministically. All files are staged before the run
+directory is published, and an identical rerun is byte-equivalent and creates no
+duplicates. The quality report contains aggregates and sanitized reason categories
+only. A short/remake candidate is defined as `game_duration_seconds < 300`.
+
+Stage 3.1 stores no raw PUUID or display identity. Its `player_key` is a stable,
+project-scoped SHA-256 pseudonym truncated to 128 bits so a player can be joined
+across matches without exposing the source identifier. This is pseudonymization,
+not anonymization; canonical files remain local and Git-ignored.
+
+Stage 3.1 deliberately does not calculate KDA, CS/min, gold/min, damage share, kill
+participation, matchup statistics, rank baselines, recommendations, or scores. Those
+analysis choices are deferred to Stage 3.2 or later.
+
+## Stage 3.2: deterministic analytical features
+
+Stage 3.2 reads only a completed, compatible Stage 3.1 run. It validates all six
+Stage 3.1 files, records their SHA-256 hashes, and creates participant-, team-, and
+match-level analytical tables under a separate schema directory. It never contacts
+Riot, loads `.env`, or modifies Stage 3.1.
+
+Validate all inputs, formulas, output rows, and reconciliations without writing:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_analytical_features.py --input-run data/processed/stage3/schema=stage3.1-v1/run=20260722T125547567196Z-population --validate-only
+```
+
+Publish the analytical dataset:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_analytical_features.py --input-run data/processed/stage3/schema=stage3.1-v1/run=20260722T125547567196Z-population
+```
+
+Output uses deterministic JSONL and staged atomic publication:
+
+```text
+data/processed/stage3/schema=stage3.2-v1/run=<stage-2-run-id>/
+  participant_match_features.jsonl
+  team_match_features.jsonl
+  match_analysis_context.jsonl
+  metadata.json
+  quality_report.json
+```
+
+The centralized `stage3.2-formulas-v1` contract uses these rules:
+
+- ratios are fractions, not percentages;
+- `total_cs = total_minions_killed + neutral_minions_killed`;
+- per-minute values divide by `game_duration_seconds / 60`;
+- `KDA = (kills + assists) / max(1, deaths)`, so zero deaths uses denominator 1;
+- kill participation divides by the participant's own-team kills;
+- gold and champion-damage shares divide by the participant's own-team totals;
+- a missing numerator or missing/non-positive denominator produces JSON `null`;
+- derived values are not rounded internally, and NaN/infinity are forbidden.
+
+For positions, a recognized `team_position` is authoritative. A disagreement never
+silently replaces it with `individual_position`; that participant remains usable for
+general factual analysis but is ineligible for role aggregation. If team position is
+missing or invalid, a recognized individual position is recorded as an explicit,
+role-ineligible fallback. No champion-based role guessing is used.
+
+All matches and participants remain present. Matches below 300 seconds retain totals
+and valid rates/shares but set `analytical_eligibility=false` with reason
+`short_game`. Other position-quality exclusions are represented separately through
+role-aggregation eligibility; a short game is not labeled a confirmed remake.
+
+Stage 3.2 still does not implement subjective scores, matchup/counterpick or synergy
+statistics, recommendations, baselines, model training, agents, or a dashboard.
+
+## Stage 3.3A: draft observation foundation
+
+Stage 3.3A turns Stage 3.1 canonical facts plus Stage 3.2 eligibility/position policy
+into factual champion-select observations. It is not an expansion of post-match
+performance scoring and does not calculate matchup win rates, synergy lifts,
+confidence, counters, recommendations, or composition scores.
+
+Validate without writing:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_draft_observations.py --stage3-1-run data/processed/stage3/schema=stage3.1-v1/run=20260722T125547567196Z-population --stage3-2-run data/processed/stage3/schema=stage3.2-v1/run=20260722T125547567196Z-population --validate-only
+```
+
+Publish the immutable observation run:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_draft_observations.py --stage3-1-run data/processed/stage3/schema=stage3.1-v1/run=20260722T125547567196Z-population --stage3-2-run data/processed/stage3/schema=stage3.2-v1/run=20260722T125547567196Z-population
+```
+
+Output is deterministic JSONL plus aggregate quality and lineage metadata:
+
+```text
+data/processed/stage3/schema=stage3.3a-v1/run=<stage-2-run-id>/
+  participant_draft_observations.jsonl
+  team_draft_observations.jsonl
+  match_draft_context.jsonl
+  draft_observation_quality_report.json
+  metadata.json
+```
+
+An opponent is assigned only when exactly one position-eligible opposing participant
+has the same recognized Stage 3.2 `analysis_position` and that pairing is reciprocal.
+Disagreement, fallback, missing, duplicate, or ambiguous positions produce a null
+opponent and an explicit reason; the code never guesses from champion identity.
+
+For a valid five-player team, each participant row lists four allied champion IDs in
+participant-ID order. Enemy compositions and team compositions use the same stable
+ordering. These are observations, not inferred synergy effects. Bans retain Riot's
+pick-turn ordering and explicit `-1` no-ban values, without claims about intended
+picks, roles, targets, or counters.
+
+Every factual row remains present. Stage 3.2 general and role eligibility is reused;
+short games remain observable but are excluded from future matchup/synergy
+aggregation. Position disagreements remain factual and do not silently change roles.
+Match-V5 does not reliably expose historical champion-select pick order, so Nexus
+Lens does not reconstruct or claim it.
+
+The retained 100 matches are sufficient to validate observation structure only. They
+cannot establish authoritative champion-role viability under the approved 5% and
+50-game rules, reliable counters, synergy conclusions, or full-roster profiles.
+Confidence intervals, shrinkage, baseline adjustment, hypothesis tests, champion tag
+taxonomy, and tag-to-score rules remain deliberately unresolved.
+
+## Stage 3.3B: transparent matchup and synergy aggregation
+
+Stage 3.3B converts the factual Stage 3.3A rows into directional matchup,
+directional ally-synergy, and champion-role sufficient statistics. It remains an
+offline evidence foundation: every observed relationship stays visible, but the
+retained population is not labeled with counters, strong synergies, or
+recommendation eligibility.
+
+Validate the retained input without writing:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_draft_aggregates.py --input-run data/processed/stage3/schema=stage3.3a-v1/run=20260722T125547567196Z-population --validate-only
+```
+
+Publish the immutable aggregate run:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\build_draft_aggregates.py --input-run data/processed/stage3/schema=stage3.3a-v1/run=20260722T125547567196Z-population
+```
+
+The Stage 3.1 and Stage 3.2 paths are discovered from Stage 3.3A metadata and every
+recorded physical hash is rechecked. Output is written separately:
+
+```text
+data/processed/stage3/schema=stage3.3b-v1/run=<stage-2-run-id>/
+  matchup_aggregates.jsonl
+  synergy_aggregates.jsonl
+  champion_role_sufficient_statistics.jsonl
+  aggregation_quality_report.json
+  metadata.json
+```
+
+A matchup is directional: A-in-TOP against B-in-TOP and B-in-TOP against A-in-TOP
+answer opposite questions and carry opposite outcomes. An ally relationship is also
+directional: A-in-TOP with C-in-JUNGLE and C-in-JUNGLE with A-in-TOP are distinct.
+Each source match or team-match may contribute at most once to the same directional
+key. Roles, queue, platform, available region/rank lineage, and collection stratum
+remain part of the grouping context.
+
+Raw observed counts are kept separately from recency-weighted quantities. The target
+is the newest input patch unless `--target-patch` is supplied. Cumulative windows
+start at that target and add at most five prior patches with weight `0.8 ** patch_age`.
+Every window records considered patches, observed patches, and missing input patch
+ages. Effective sample size is `(sum_weights ** 2) / sum_squared_weights`. It is
+reported alongside observed game count and is null when total squared weight is zero.
+Missing patches are not zero-result observations.
+
+For each matchup, Stage 3.3B separately preserves the focal champion-role performance
+against other opponents and the opposing champion-role performance against other
+focal champions. Synergy rows similarly preserve the focal champion-role without the
+specific ally and the ally champion-role without the focal champion. The direct focal
+pair is excluded from these broader components, preventing it from being counted
+both as direct evidence and as its own baseline evidence.
+
+The reusable beta-binomial primitive requires callers to supply both a baseline
+probability and prior equivalent-game strength. The prior mean will eventually come
+from broader champion-role evidence; calibrated prior strength will determine the
+equivalent pseudo-games. Pseudo-wins and pseudo-losses are calculated prior
+quantities, not additional direct observations. Fractional weighted counts are
+supported. `scipy.stats.beta.sf` directly calculates the regularized incomplete-beta
+survival probability for numerical stability near one; Nexus Lens does not implement
+a custom numerical approximation.
+
+The provisional minimum practical advantage is configurable and defaults to `0.01`.
+Evidence tiers use the approved 0.90 and 0.95 posterior-probability boundaries.
+However, the baseline-combination formula, prior strength, minimum effective sample,
+calibration method, adaptive-window stopping rule, major-change history policy, and
+causal synergy controls remain unresolved. Consequently, the normal Stage 3.3B run
+leaves every posterior field null with
+`statistical_status=not_evaluated_policy_unresolved`.
+
+The retained 100 EUNE games validate aggregation mechanics only. Visible raw
+observations are not recommendation eligibility, weak samples are not counters, and
+the current data cannot establish authoritative full-roster role viability or
+reliable counter claims.
+
+## Collection-lineage repair
+
+The retained run's missing Stage 3.3B dimensions were traced to specific schema
+boundaries, not missing sampler behavior:
+
+- `platform_id=eun1` survived normalization and Stage 3.1;
+- `regional_routing=europe` and analysis region `eune` survived in the Stage 2
+  checkpoint/manifest but Stage 3.1 did not emit them;
+- seed tier/division and the match-to-seed relationship survived in
+  `checkpoint.matches[*].sources`, then Stage 3.1 reduced that state to match
+  approval and patch;
+- League-V4 ranked Solo/Duo tier/division survived in retained
+  `sampling.candidates`, but it applied only to the player in that entry and was
+  never joined into Stage 3.1;
+- rank-observation and match-discovery timestamps were never collected in the
+  legacy checkpoint.
+
+The immutable Stage 3.1/3.2/3.3A/3.3B directories are not rewritten. A separate
+`lineage-v1` sidecar verifies their hashes and the source checkpoint/manifest, then
+publishes one match-lineage row and one participant-match rank-lineage row per
+canonical row. Collection contexts are never presented as observed participant or
+match rank. Multiple discovery contexts are nested and sorted under one match row,
+so they cannot multiply analytical contributions.
+
+Validate without writing, then publish:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\repair_collection_lineage.py --validate-only
+.\.venv\Scripts\python.exe scripts\repair_collection_lineage.py
+```
+
+The retained sidecar contains 100 match rows, 100 discovery contexts, and 1,000
+participant rows. Stored League-V4 responses prove rank for 104 participant-match
+rows representing 15 unique players; 896 rows remain `not_collected`. No retained
+rank or discovery timestamp can be recovered. See
+[docs/lineage_audit.md](docs/lineage_audit.md) for the complete trace.
+
+Future checkpoints use schema version 4. They record platform, regional route,
+analysis region, pseudonymous seed key, collection context, independently observed
+seed rank and timestamp, discovery timestamp/source, and every match-to-seed
+relationship. The aggregate manifest records only the policy/version flag; it does
+not expose player keys.
+
 ## Stage 2: controlled population sampling
 
 EUNE uses platform route `eun1` for League/Summoner endpoints and regional route
@@ -147,6 +423,29 @@ Zero-request dry run:
 ```powershell
 .\.venv\Scripts\python.exe scripts\collect_population.py --platform eun1 --target-public-patch 26.14 --patch-window-size 2 --tiers GOLD PLATINUM EMERALD DIAMOND --divisions I II III IV --target-matches 10 --max-players 25 --initial-history-batch-size 5 --max-history-per-player 20 --older-patch-stop-threshold 2 --sampling-strategy balanced --minimum-players-per-tier 0 --max-match-ids 250 --max-requests 300 --seed 42 --concurrency 1 --smoke-test --dry-run
 ```
+
+For a later multi-platform run, the dedicated planner is safer and more explicit.
+It does not load `.env`, construct an API client, or make requests. It only checks
+whether the `NEXUS_LENS_RIOT_API_KEY` environment-variable name is present and
+never reads or prints its value:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\plan_expanded_collection.py --config config/collection/eune-pilot.example.json
+.\.venv\Scripts\python.exe scripts\plan_expanded_collection.py --config config/collection/euw-pilot.example.json
+```
+
+The checked-in examples use retained patch `26.14` solely to remain executable.
+Replace `target_public_patch` with the verified current public patch immediately
+before an authorized run; `patch_window_size=2` then means current plus one previous
+same-season patch. Planning output separates `eun1/eune` from `euw1/euw`, reports
+all 16 tier/division strata, even planning allocations, newest-first traversal,
+explicit ceilings and output/checkpoint templates, queue 420, and lineage status.
+
+Pilot examples target 1,000 accepted matches per platform. The corresponding
+`eune-serious.example.json` and `euw-serious.example.json` examples target 10,000.
+Those sizes, per-stratum allocations, and request ceilings are operational examples,
+not approved statistical thresholds. Later expansion must depend on repeated-matchup
+coverage and held-out/backtest stability. No planning command starts collection.
 
 Ten-match EUNE smoke test:
 
@@ -234,10 +533,11 @@ synergy, balance, population, or recommendation conclusions.
 ## Privacy and local data
 
 Raw responses and population checkpoints contain sensitive encrypted identifiers or
-PUUIDs needed for official API calls, provenance, and deduplication. Normalized data
-retains PUUID only as an internal cross-match key. Console summaries and reports
-contain aggregate counts only and never emit Riot IDs, names, PUUIDs, summoner IDs,
-or sampled-player identifiers.
+PUUIDs needed for official API calls, provenance, and deduplication. Legacy Stage 1/2
+normalized records retain PUUID as an internal cross-match key; Stage 3.1 canonical
+tables replace it with `player_key`. Console summaries and reports contain aggregate
+counts only and never emit Riot IDs, names, PUUIDs, summoner IDs, or sampled-player
+identifiers.
 
 Everything under `data/raw`, `data/processed`, and `data/snapshots` is Git-ignored.
 See [docs/data_dictionary.md](docs/data_dictionary.md) and

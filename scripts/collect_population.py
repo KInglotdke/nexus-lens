@@ -155,7 +155,7 @@ async def run_collection(args: argparse.Namespace, config: PopulationConfig) -> 
         saved_config = state.payload["config"]
         validate_checkpoint_extension(saved_config, config)
         state.payload["config"] = config.non_sensitive_dict()
-        state.payload["version"] = max(3, int(state.payload.get("version", 1)))
+        state.payload["version"] = max(4, int(state.payload.get("version", 1)))
         state.save()
     else:
         state = PopulationState.create(

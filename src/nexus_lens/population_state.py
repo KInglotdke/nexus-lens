@@ -25,7 +25,7 @@ class PopulationState:
         state = cls(
             path,
             {
-                "version": 3,
+                "version": 4,
                 "run_id": run_id,
                 "config": config,
                 "players": {},

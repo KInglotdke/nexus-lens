@@ -5,7 +5,7 @@ import json
 import random
 import re
 import time
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -17,6 +17,7 @@ from nexus_lens.catalog import ProcessingCatalog
 from nexus_lens.normalization import NormalizationError, normalize_match
 from nexus_lens.patches import accepted_public_patch_window
 from nexus_lens.population_state import PopulationState, atomic_write_json
+from nexus_lens.privacy import pseudonymize_puuid
 from nexus_lens.riot_client import (
     RiotApiError,
     RiotClient,
@@ -29,6 +30,7 @@ from nexus_lens.storage import write_normalized_batch
 DEFAULT_TIERS = ("GOLD", "PLATINUM", "EMERALD", "DIAMOND")
 DEFAULT_DIVISIONS = ("I", "II", "III", "IV")
 SAMPLING_STRATEGIES = ("balanced", "fast")
+COLLECTION_LINEAGE_POLICY_VERSION = "collection-lineage-v1"
 PLATFORM_ROUTES = {
     "eun1": ("europe", "eune"),
     "euw1": ("europe", "euw"),
@@ -380,7 +382,7 @@ class PopulationCollector:
 
     def _ensure_state_shape(self) -> None:
         self.state.payload["version"] = max(
-            3, int(self.state.payload.get("version", 1))
+            4, int(self.state.payload.get("version", 1))
         )
         self.state.payload.setdefault("overlap_events", 0)
         self.state.payload.setdefault("request_metrics", {})
@@ -395,12 +397,17 @@ class PopulationCollector:
                 ],
                 "cursor": 0,
                 "candidates": {},
+                "candidate_observed_at": {},
                 "candidate_offsets": {},
                 "exhausted": [],
             }
             self.state.payload["sampling"] = sampling
         elif sampling.get("strategy") != self.config.sampling_strategy:
             raise ValueError("resume sampling strategy differs from checkpoint")
+        sampling.setdefault("candidate_observed_at", {})
+        _repair_legacy_player_lineage(self.state.players, sampling)
+        self.state.payload["lineage_policy_version"] = COLLECTION_LINEAGE_POLICY_VERSION
+        self.state.payload["lineage_preservation_enabled"] = True
         self._update_checkpoint_metadata()
         self.state.save()
 
@@ -475,7 +482,12 @@ class PopulationCollector:
             self.state.save()
             if entry is None:
                 continue
-            await self._examine_player(entry, item["tier"], item["division"])
+            await self._examine_player(
+                entry,
+                item["tier"],
+                item["division"],
+                rank_observed_at=self._candidate_observed_at(item),
+            )
 
     async def _collect_fast(self) -> None:
         sampling = self.state.payload["sampling"]
@@ -487,7 +499,12 @@ class PopulationCollector:
                 sampling["cursor"] = int(sampling["cursor"]) + 1
                 self.state.save()
                 continue
-            await self._examine_player(entry, item["tier"], item["division"])
+            await self._examine_player(
+                entry,
+                item["tier"],
+                item["division"],
+                rank_observed_at=self._candidate_observed_at(item),
+            )
 
     async def _next_candidate(self, item: dict[str, Any]) -> LeagueEntry | None:
         sampling = self.state.payload["sampling"]
@@ -517,6 +534,7 @@ class PopulationCollector:
             sampling["candidates"][key] = [
                 entry.model_dump(mode="json", by_alias=True) for entry in entries
             ]
+            sampling["candidate_observed_at"][key] = datetime.now(UTC).isoformat()
             sampling["candidate_offsets"][key] = 0
         offset = int(sampling["candidate_offsets"].get(key, 0))
         candidates = sampling["candidates"][key]
@@ -527,6 +545,11 @@ class PopulationCollector:
         sampling["candidate_offsets"][key] = offset + 1
         return LeagueEntry.model_validate(candidates[offset])
 
+    def _candidate_observed_at(self, item: dict[str, Any]) -> str | None:
+        key = _stratum_key(item["tier"], item["division"], item["start_page"])
+        value = self.state.payload["sampling"]["candidate_observed_at"].get(key)
+        return str(value) if isinstance(value, str) and value else None
+
     async def _resume_incomplete_players(self) -> None:
         for puuid, player in list(self.state.players.items()):
             if self._should_stop():
@@ -535,7 +558,12 @@ class PopulationCollector:
                 await self._continue_player_history(puuid, player)
 
     async def _examine_player(
-        self, entry: LeagueEntry, tier: str, division: str
+        self,
+        entry: LeagueEntry,
+        tier: str,
+        division: str,
+        *,
+        rank_observed_at: str | None = None,
     ) -> bool:
         try:
             puuid = await self._resolve_puuid(entry)
@@ -552,6 +580,13 @@ class PopulationCollector:
             return False
         existing = self.state.players.get(puuid)
         if existing is not None:
+            _merge_player_lineage(
+                existing,
+                entry=entry,
+                tier=tier,
+                division=division,
+                rank_observed_at=rank_observed_at,
+            )
             if existing.get("status") not in _TERMINAL_PLAYER_STATUSES:
                 await self._continue_player_history(puuid, existing)
             return False
@@ -564,6 +599,11 @@ class PopulationCollector:
             "history_offset": 0,
             "consecutive_older_patch": 0,
             "history_pending_ids": [],
+            "seed_player_key": pseudonymize_puuid(puuid),
+            "collection_contexts": [_collection_context(tier=tier, division=division)],
+            "rank_observations": [
+                _rank_observation(entry, rank_observed_at=rank_observed_at)
+            ],
         }
         self.state.players[puuid] = player
         self.state.save()
@@ -697,11 +737,24 @@ class PopulationCollector:
     def _register_match(
         self, match_id: str, puuid: str, tier: str, division: str
     ) -> dict[str, Any]:
-        source = {"puuid": puuid, "tier": tier, "division": division}
+        player = self.state.players.get(puuid, {})
+        source = _match_discovery_source(
+            puuid=puuid,
+            player=player,
+            tier=tier,
+            division=division,
+            platform=self.config.platform.lower(),
+            regional_routing=self.config.regional_routing,
+            analysis_region=self.config.analysis_region,
+        )
         existing = self.state.matches.get(match_id)
         if existing is not None:
-            if source not in existing.setdefault("sources", []):
-                existing["sources"].append(source)
+            sources = existing.setdefault("sources", [])
+            if not any(
+                _source_identity(item) == _source_identity(source) for item in sources
+            ):
+                sources.append(source)
+                sources.sort(key=_source_sort_key)
                 self.state.payload["overlap_events"] += 1
             if existing.get("status") not in ("pending", "request_failed"):
                 self._record_cache_hit(match_id, existing)
@@ -1182,6 +1235,8 @@ class PopulationCollector:
                 "configuration": self.config.non_sensitive_dict(),
                 "match_files": accepted_files,
                 "summary": summary.as_dict(),
+                "lineage_policy_version": COLLECTION_LINEAGE_POLICY_VERSION,
+                "lineage_preservation_enabled": True,
             },
         )
 
@@ -1383,6 +1438,189 @@ def _ratio(numerator: int, denominator: int) -> float | None:
 
 def _stratum_key(tier: str, division: str, start_page: int) -> str:
     return f"{tier}:{division}:{start_page}"
+
+
+def _collection_context(*, tier: str, division: str) -> dict[str, object]:
+    normalized_tier = tier.upper()
+    normalized_division = division.upper()
+    return {
+        "collection_tier": normalized_tier,
+        "collection_division": normalized_division,
+        "collection_stratum": f"{normalized_tier} {normalized_division}",
+        "collection_context_status": "collection_context",
+        "source": "league_v4_ladder_sampling_schedule",
+    }
+
+
+def _rank_observation(
+    entry: LeagueEntry, *, rank_observed_at: str | None
+) -> dict[str, object]:
+    observed = bool(entry.tier and entry.rank and entry.queueType == "RANKED_SOLO_5x5")
+    return {
+        "rank_tier": entry.tier.upper() if observed else None,
+        "rank_division": entry.rank.upper() if observed else None,
+        "queue_id": 420,
+        "rank_status": "observed" if observed else "not_collected",
+        "rank_source": "league_v4_ranked_solo_ladder_entry" if observed else None,
+        "rank_observed_at": rank_observed_at if observed else None,
+        "rank_observed_at_status": (
+            "observed"
+            if observed and rank_observed_at is not None
+            else "not_collected"
+        ),
+    }
+
+
+def _merge_player_lineage(
+    player: dict[str, Any],
+    *,
+    entry: LeagueEntry,
+    tier: str,
+    division: str,
+    rank_observed_at: str | None,
+) -> None:
+    contexts = player.setdefault("collection_contexts", [])
+    context = _collection_context(tier=tier, division=division)
+    if context not in contexts:
+        contexts.append(context)
+        contexts.sort(
+            key=lambda item: (
+                str(item.get("collection_tier")),
+                str(item.get("collection_division")),
+            )
+        )
+    observations = player.setdefault("rank_observations", [])
+    observation = _rank_observation(entry, rank_observed_at=rank_observed_at)
+    identity = (
+        observation["rank_tier"],
+        observation["rank_division"],
+        observation["rank_source"],
+    )
+    if not any(
+        (
+            item.get("rank_tier"),
+            item.get("rank_division"),
+            item.get("rank_source"),
+        )
+        == identity
+        for item in observations
+    ):
+        observations.append(observation)
+        observations.sort(
+            key=lambda item: (
+                str(item.get("rank_tier")),
+                str(item.get("rank_division")),
+                str(item.get("rank_source")),
+            )
+        )
+
+
+def _repair_legacy_player_lineage(
+    players: dict[str, dict[str, Any]], sampling: dict[str, Any]
+) -> None:
+    candidates_by_puuid: dict[str, list[tuple[LeagueEntry, str | None]]] = defaultdict(
+        list
+    )
+    observed_at = sampling.get("candidate_observed_at", {})
+    for stratum, candidates in sampling.get("candidates", {}).items():
+        timestamp = observed_at.get(stratum)
+        for candidate in candidates:
+            try:
+                entry = LeagueEntry.model_validate(candidate)
+            except ValidationError:
+                continue
+            if entry.puuid:
+                candidates_by_puuid[entry.puuid].append(
+                    (entry, str(timestamp) if timestamp else None)
+                )
+    for puuid, player in players.items():
+        player.setdefault("seed_player_key", pseudonymize_puuid(puuid))
+        tier = str(player.get("tier") or "")
+        division = str(player.get("division") or "")
+        if tier and division:
+            contexts = player.setdefault("collection_contexts", [])
+            context = _collection_context(tier=tier, division=division)
+            if context not in contexts:
+                contexts.append(context)
+        player.setdefault("rank_observations", [])
+        for entry, timestamp in candidates_by_puuid.get(puuid, []):
+            _merge_player_lineage(
+                player,
+                entry=entry,
+                tier=tier or str(entry.tier or ""),
+                division=division or str(entry.rank or ""),
+                rank_observed_at=timestamp,
+            )
+
+
+def _match_discovery_source(
+    *,
+    puuid: str,
+    player: dict[str, Any],
+    tier: str,
+    division: str,
+    platform: str,
+    regional_routing: str,
+    analysis_region: str,
+) -> dict[str, Any]:
+    rank_observations = sorted(
+        player.get("rank_observations", []),
+        key=lambda item: (
+            str(item.get("rank_tier")),
+            str(item.get("rank_division")),
+            str(item.get("rank_source")),
+        ),
+    )
+    observed_ranks = {
+        (item.get("rank_tier"), item.get("rank_division"))
+        for item in rank_observations
+        if item.get("rank_status") == "observed"
+    }
+    if len(observed_ranks) == 1:
+        rank_tier, rank_division = next(iter(observed_ranks))
+        rank_status = "observed"
+    elif observed_ranks:
+        rank_tier = rank_division = None
+        rank_status = "ambiguous"
+    else:
+        rank_tier = rank_division = None
+        rank_status = "not_collected"
+    context = _collection_context(tier=tier, division=division)
+    return {
+        "puuid": puuid,
+        "seed_player_key": player.get("seed_player_key") or pseudonymize_puuid(puuid),
+        "platform_id": platform,
+        "platform_status": "observed",
+        "regional_routing": regional_routing,
+        "regional_routing_status": "collection_context",
+        "analysis_region": analysis_region,
+        "analysis_region_status": "derived",
+        "tier": tier,
+        "division": division,
+        **context,
+        "seed_rank_tier": rank_tier,
+        "seed_rank_division": rank_division,
+        "seed_rank_status": rank_status,
+        "seed_rank_observations": rank_observations,
+        "discovery_timestamp": datetime.now(UTC).isoformat(),
+        "discovery_timestamp_status": "observed",
+        "discovery_source": "match_v5_history_by_seed_puuid",
+        "discovery_source_status": "observed",
+        "lineage_policy_version": COLLECTION_LINEAGE_POLICY_VERSION,
+    }
+
+
+def _source_identity(source: dict[str, Any]) -> tuple[str, ...]:
+    return (
+        str(source.get("seed_player_key") or source.get("puuid") or ""),
+        str(source.get("collection_tier") or source.get("tier") or ""),
+        str(source.get("collection_division") or source.get("division") or ""),
+        str(source.get("platform_id") or ""),
+    )
+
+
+def _source_sort_key(source: dict[str, Any]) -> tuple[str, ...]:
+    return (*_source_identity(source), str(source.get("discovery_timestamp") or ""))
 
 
 def _safe(value: str) -> str:

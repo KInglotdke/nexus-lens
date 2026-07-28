@@ -18,11 +18,258 @@ Stage 2 population sample ─┘              |
                          |                                 |
                          +----------------+----------------+
                                           v
-                              aggregate-only reports
+                         Stage 3.1 approval/provenance gate
+                                          |
+                                          v
+                  canonical matches/participants/teams/bans JSONL
+                                          |
+                                          v
+                              aggregate-only quality report
+                                          |
+                                          v
+                     Stage 3.2 deterministic formula contract
+                                          |
+                                          v
+             participant/team features + match analysis context
+                                          |
+                                          v
+                    Stage 3.3A factual draft observations
+                                          |
+                                          v
+             Stage 3.3B matchup/synergy sufficient statistics
+                                          |
+                                          v
+                 future calibrated recommendation evidence
 ```
 
 Only explicit collection and inspection commands load `.env` or contact Riot.
 Snapshot processing, migration, reporting, tests, and population dry-run are offline.
+
+## Stage 3.1 canonicalization
+
+The completed Stage 2 manifest establishes run completion and aggregate patch
+counts, while its matching sensitive checkpoint supplies the exact approved match
+set. A raw cache hit is not approval by itself. For every approved ID, Stage 3.1
+requires a processed catalog row, an actual-public-patch normalized match record,
+and an immutable retained Match-V5 payload. Conflicting IDs, queues, public patches,
+or duplicate retained payloads fail closed before publication.
+
+The current raw population layout stores newly downloaded payloads in each run's
+`downloads/` directory. Reused accepted payloads remain in earlier retained run
+directories. Stage 2 derived match records are partitioned by actual public patch.
+Stage 3.1 resolves those locations from the retained state instead of assuming every
+approved payload was copied into the final continuation run.
+
+Canonical output uses the project's established deterministic JSONL format because
+Parquet is not otherwise supported and this feasibility dataset is small. The four
+tables are sorted by stable keys and written to a schema- and run-versioned directory
+separate from both raw data and older normalized partitions. Files are fully staged
+before publication; byte-identical reruns leave the existing directory untouched.
+
+Transformation reads raw statistics without adding analysis features. In
+particular, it does not calculate KDA, rates, shares, kill participation, matchup
+results, baselines, or scores. A narrowly selected set of Riot challenge counters is
+retained as nullable raw source data. The aggregate quality report records shape,
+position, ban, timestamp, duration, queue, mode, missingness, sanitized skip, and
+invariant categories.
+
+## Stage 3.2 analytical feature flow
+
+Stage 3.2 begins with a strict compatibility gate over `stage3.1-v1` metadata,
+quality status, physical row counts, unique keys, patch counts, and cross-table match
+IDs. It hashes all six Stage 3.1 artifacts before derivation. Those hashes become
+lineage in Stage 3.2 metadata and the aggregate quality report; the input directory
+is opened only for reads.
+
+Participant rows are grouped by their own `(match_id, team_id)` before team
+denominators are calculated. Complete five-player source vectors produce team kills,
+deaths, assists, gold, champion damage, and CS. A missing component propagates to the
+team total and dependent shares instead of being imputed. Participant features then
+receive only their own team's denominators. Team features also retain the canonical
+objective counts and first-objective flags for reconciliation and later factual
+analysis.
+
+All formulas live in one versioned contract. Ratios use fractional units; undefined
+division returns null; KDA uses denominator one at zero deaths; output serialization
+rejects NaN and infinity. Feature values remain unrounded. The quality layer records
+derived null counts, zero-denominator events, ranges, share-sum checks, canonical
+team-kill comparisons, opposing-death comparisons, and hard invariants.
+
+Position policy is deliberately conservative. Recognized team position remains the
+analysis position. A recognized individual position can fill a missing/invalid team
+position only as an explicit fallback, and both fallback and disagreement rows are
+ineligible for role aggregation. Champion identity is never used to infer role.
+
+The 300-second Stage 3.1 threshold is reused without relabeling short games as proven
+remakes. Short games remain in all tables and retain factual totals plus valid
+rates/shares, but they are excluded from population-baseline eligibility through a
+machine-readable reason. Match-wide analytical eligibility and role-position
+eligibility remain separate so a position disagreement does not discard otherwise
+valid match facts.
+
+Output is staged as a complete schema/run directory before publication. An identical
+rerun compares byte content and leaves the existing output untouched. Stage 3.2 is a
+feature foundation for later analysis validation, not recommendation logic or a
+subjective performance model.
+
+## Stage 3.3A draft observation flow
+
+Nexus Lens is primarily a champion-select recommendation project. Stage 3.3A pivots
+the processed match foundation toward factual inputs for future matchup, ally-synergy,
+and composition analysis while preserving Stage 3.2 rather than extending
+post-match performance scoring.
+
+The stage reads immutable Stage 3.1 and Stage 3.2 directories, hashes every physical
+input, and verifies that Stage 3.2's recorded Stage 3.1 hashes still match. It then
+reconciles participant, match, patch, outcome, position, eligibility, team, and ban
+keys before producing observations. Existing Stage 3.3A lineage rejects changed
+prior-stage hashes instead of silently replacing the run.
+
+Participant and team compositions are ordered by match-local participant ID. An ally
+list is emitted only for a team with exactly five participants; a complete team gives
+each participant four factual ally relationships. Bans are ordered by Riot
+`pick_turn`, with null turns last and champion ID as a deterministic tie-break.
+
+Lane pairing uses only the approved Stage 3.2 `analysis_position`. A participant is
+position-pairing eligible when the analysis position is recognized, its source is
+`team_position`, and the canonical team/individual positions do not disagree. A lane
+opponent is emitted only for a unique reciprocal same-position pair. Missing,
+duplicated, ambiguous, fallback, disagreement, or structurally invalid cases remain
+as observations with null opponent fields and machine-readable reasons. Champion
+identity is never used to guess a lane.
+
+General, role, matchup, and synergy eligibility remain separate. Short games and
+other Stage 3.2 exclusions are carried forward. Matchup eligibility additionally
+requires a reliable lane opponent; synergy eligibility requires a structurally valid
+five-player allied team. No row is deleted because it is inconvenient.
+
+Stage 3.1 supplies platform lineage (`eun1`) but the approved Stage 3.1/3.2 tables do
+not contain explicit analysis-region, rank-bracket, or collection-stratum fields.
+Stage 3.3A marks those values unavailable rather than reopening sensitive checkpoints
+or inferring them. Match-V5 also cannot support a reliable historical pick-order
+claim, so pick order is absent by policy.
+
+The later `lineage-v1` repair is a companion dataset rather than an edit to any
+existing Stage 3 run. It validates the physical hashes recorded through Stage 3.3B,
+then joins the retained checkpoint only where an exact pseudonymous player or
+match-source relationship proves the value. Its match rows nest all discovery
+contexts; its participant rows remain one per canonical participant. Downstream
+consumers therefore join lineage onto existing unique keys instead of re-expanding
+one match for each seed.
+
+Metadata contains a deterministic UTC timestamp parsed from the source run ID,
+generation policy, reproduction command, all prior-stage hashes, and hashes of every
+non-metadata output. Metadata excludes its own hash to avoid self-reference. Files
+are staged before atomic publication and identical reruns are byte-equivalent.
+
+The output is ready only for factual aggregation and coverage validation. Statistical
+confidence, shrinkage, baselines, hypothesis tests, counter labels, champion-role
+profile tags, and tag-to-score rules remain future decisions.
+
+## Stage 3.3B aggregation and statistical primitives
+
+Stage 3.3B reads the immutable Stage 3.3A run and discovers its related Stage 3.1 and
+Stage 3.2 directories from Stage 3.3A metadata. It hashes all five Stage 3.3A
+artifacts and rechecks every recorded Stage 3.1 and Stage 3.2 hash before aggregation.
+The loader fails closed on schema, policy, quality-gate, physical-hash, key, or
+cross-table lineage conflicts.
+
+Eligible resolved lane rows become directional matchup contributions. A source match
+can contribute once to A-role-versus-B-role and once to the reverse B-role-versus-A
+question, with reconciled opposite outcomes, but never twice to either directional
+group. Structurally valid synergy rows create four directional focal-with-ally
+relationships per eligible participant. Team-match and logical-group keys prevent a
+duplicate ally relationship from entering one direction. Champion ID and position,
+not champion name, identify every group.
+
+The patch target defaults to the newest numeric public patch in the input. An
+explicit CLI target is also supported. Stage 3.3B builds every cumulative window from
+age zero through the oldest available input age, capped at five previous patches.
+Weights are exactly `0.8 ** patch_age`; no evidence-based early stop is applied.
+Windows distinguish patches considered, patches observed for the group, and patch
+ages absent from the entire input. An absent patch contributes no row and no weight.
+
+Every statistics bundle keeps integer observed games/wins/losses and raw win rate
+separate from weighted wins/losses, total and squared weights, weighted win rate, and
+effective sample size. Effective sample size is `(sum(weights) ** 2) /
+sum(weights ** 2)` and is null for a zero squared-weight denominator. It is not
+treated as an observed game count.
+
+Broader baseline components are sufficient statistics, not final baselines. For a
+focal matchup, the focal champion-role component excludes the exact opponent pair;
+the opponent champion-role component uses its own directional performance and
+excludes the focal pair. Synergy performs the analogous calculation using
+participant-games where the specific ally is absent. This prevents direct focal
+evidence from also contributing to its own broader baseline. Availability is factual;
+sparsity remains unevaluated because no minimum effective-sample threshold is
+approved.
+
+The pure beta-binomial primitive accepts an explicit baseline probability, explicit
+prior equivalent-game strength, weighted or integral wins/losses, and a configurable
+minimum practical advantage. Prior expected wins and losses are derived pseudo-counts
+from the broader-data prior mean and calibrated strength; they are not direct
+matchup observations. Posterior practical-advantage probability uses
+`scipy.stats.beta.sf` directly, avoiding the numerical loss from `1 - cdf` near one.
+Zero prior strength is supported only when positive observed wins and losses still
+form a proper Beta posterior. Inputs must be finite; the baseline is strictly inside
+zero and one; distribution thresholds outside the unit interval return the exact
+support-boundary probability.
+
+Normal population aggregation never calls that posterior primitive. The
+baseline-combination formula and prior strength are unresolved, so every retained
+posterior field remains null and the status is
+`not_evaluated_policy_unresolved`. The output is suitable for parameter calibration
+and historical backtesting design, not counter labels, reliable synergy claims, or
+recommendation scoring.
+
+Publication stages all five files before atomic replacement. Existing output rejects
+changed Stage 3.3A lineage, validation-only mode writes nothing, and byte-identical
+reruns leave the directory unchanged.
+
+## Forward collection lineage
+
+Checkpoint schema 4 preserves three different scopes:
+
+1. A collection context is the configured tier/division path used to discover a
+   seed. It has status `collection_context`.
+2. A rank observation is a League-V4 Ranked Solo/Duo response for one specific
+   player. It has `rank_source`, `rank_observed_at`, and `observed`,
+   `ambiguous`, or `not_collected` status.
+3. A discovery context relates one pseudonymous seed to one match and records
+   platform, regional routing, analysis region, stratum, source, and timestamp.
+
+These scopes never collapse into a universal match rank. If histories overlap, all
+unique match-to-seed contexts are retained in deterministic order. Analytics still
+has one match key and ten participant-match keys, preventing double-counting.
+Checkpoint state may retain source Riot identifiers because it is ignored sensitive
+operational data; versioned lineage output uses the same project-scoped player
+pseudonym as Stage 3.1 and aggregate reports contain no player key.
+
+The no-network expanded planner composes independent `PopulationConfig` instances
+for EUNE (`eun1`, `europe`, `eune`) and EUW (`euw1`, `europe`, `euw`). It fixes queue
+420 and balanced, newest-first, resumable behavior while keeping patch window,
+targets, and request ceilings explicit. Planning never authorizes or starts a
+collection.
+
+## Composition-aware future modelling
+
+Future recommendation work must retain four distinct questions:
+
+1. Lane or same-role matchup advantage: the direct focal-versus-opponent effect.
+2. Whole-draft/team-composition win probability: interactions among both complete
+   teams.
+3. Player familiarity and champion-pool fit: player-specific suitability, separate
+   from population matchup evidence.
+4. Final champion-select recommendation: a decision layer that may combine the
+   prior three with explicit policy and uncertainty.
+
+A later evaluation should compare a composition-only model against composition plus
+direct matchup effects, then compare counterfactual candidate picks while holding
+the surrounding allied and enemy draft fixed. Match victory alone does not prove
+lane dominance. If lane-outcome labels are eventually required, Timeline-V5 may be
+needed for gold, CS, XP, kills, and plates at fixed elapsed times. Timeline
+collection and composition-model implementation are intentionally outside this
+stage.
 
 ## Patch resolution
 
@@ -139,8 +386,10 @@ include only processed catalog IDs and deduplicate legacy compatibility files.
 
 Raw Match-V5 data and discovery checkpoints are ignored and may contain encrypted
 identifiers required for API calls. Run manifests, console output, JSON reports, and
-Markdown reports contain configuration and aggregate counts only. Normalized records
-omit display identities; PUUID remains an explicitly sensitive internal key.
+Markdown reports contain configuration and aggregate counts only. Legacy normalized
+records omit display identities but retain PUUID as an explicitly sensitive internal
+key. Stage 3.1 canonical participant rows replace it with a stable project-scoped
+hashed `player_key`; no reversal mapping is written.
 
 ## Sampling bias and deferred work
 
