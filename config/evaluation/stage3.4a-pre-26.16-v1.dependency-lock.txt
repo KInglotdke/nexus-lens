@@ -1,0 +1,12 @@
+# Stage 3.4A pre-26.16 freeze environment (privacy-safe exact versions)
+python==3.12.10
+httpx==0.28.1
+numpy==2.5.1
+pydantic==2.13.4
+pydantic-settings==2.14.2
+python-dotenv==1.2.2
+scipy==1.18.0
+pytest==8.4.2
+pytest-asyncio==0.26.0
+respx==0.23.1
+ruff==0.15.22

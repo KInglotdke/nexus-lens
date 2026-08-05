@@ -383,6 +383,82 @@ pilot roots. Its non-sensitive artifact-lifecycle record is in
 `--expected-match-count 1000`; normalization supports `--validate-only` and writes
 neither normalized data, catalog state, nor reports in that mode.
 
+## Stage 3.3C: offline chronological backtesting
+
+Stage 3.3C fits deliberately simple reference policies on strictly earlier public
+patches and evaluates them on a later patch. Splits are match-level, platforms and
+analysis regions remain separate, queue 420 is required, directional matchup and
+synergy keys remain distinct, and evaluation outcomes never enter fitted features.
+Repeated `--evaluation-patch` arguments support rolling-origin folds.
+
+The `26.14 -> 26.15` pilot evaluation is a mechanical smoke test only. Its explicit
+prior-equivalent-game value, clipping bounds, calibration bins, and any resulting
+metric are not approved production parameters. Stage 3.3B population outputs remain
+`not_evaluated_policy_unresolved`; Stage 3.3C does not rewrite them or authorize a
+baseline formula, prior strength, winning policy, reliability claim, or
+recommendation.
+
+Validate the two platforms independently:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\backtest_policies.py --input-run data/pilot/26.15/eune/processed/stage3/schema=stage3.3a-v1/run=20260803T141321876182Z-population --output-root data/pilot/26.15/eune/processed/stage3 --analysis-region EUNE --evaluation-patch 26.15 --experimental-prior-equivalent-games 10 --calibration-bins 10 --clip-min 0.01 --clip-max 0.99 --bootstrap-replicates 200 --bootstrap-seed 33003 --expected-match-count 1000 --validate-only
+
+.\.venv\Scripts\python.exe scripts\backtest_policies.py --input-run data/pilot/26.15/euw/processed/stage3/schema=stage3.3a-v1/run=20260803T141945176809Z-population --output-root data/pilot/26.15/euw/processed/stage3 --analysis-region EUW --evaluation-patch 26.15 --experimental-prior-equivalent-games 10 --calibration-bins 10 --clip-min 0.01 --clip-max 0.99 --bootstrap-replicates 200 --bootstrap-seed 33003 --expected-match-count 1000 --validate-only
+```
+
+The schema-versioned publication contains aggregate JSON metrics, a Markdown report,
+a quality report, and exact lineage/configuration hashes. It contains no raw Riot
+identifiers, names, match identifiers, or pseudonymous player keys. Undefined
+metrics are `null`, explicit clipping is recorded, and NaN/infinity are rejected.
+See [docs/stage3_3c.md](docs/stage3_3c.md) for policy interfaces, metric definitions,
+leakage gates, publication semantics, rolling-origin behavior, and deferred work.
+
+Read-only storage readiness audit:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\audit_storage.py --data-root data
+```
+
+The audit inventories current components, exact canary/pilot file duplication,
+shared pilot operational sources, bytes per accepted match,
+10,000-match-per-platform projections, temporary publication headroom, and
+reversible retention options. It never moves, deletes, compresses, or rewrites
+artifacts.
+
+## Stage 3.4A: composition-aware modelling harness
+
+Stage 3.4A represents a complete draft as five allied and five opposing
+champion-role assignments and one match outcome. It compares a fixed 0.5 prediction,
+the training-only champion-role baseline, deterministic L2 logistic composition,
+and composition plus signed same-role matchup features. Models are fitted separately
+for EUNE and EUW.
+
+The feature encoding is antisymmetric and uses no intercept. Swapping teams negates
+the vector and therefore complements the probability. Roles remain attached under
+ordering changes; duplicate match/participant rows fail; unseen features contribute
+zero; and evaluation outcomes never enter feature construction. Regularization is
+selected only in seeded match-grouped folds of patch 26.14.
+
+The 26.15 run is a non-calibrating development smoke fold. No winning model,
+counter/synergy claim, candidate ranking, or recommendation is produced. The offline
+counterfactual API replaces one caller-selected slot while hashing the nine unchanged
+slots and labels the result mechanical and non-causal.
+
+```powershell
+.\.venv\Scripts\python.exe scripts\model_compositions.py --input-run data/pilot/26.15/eune/processed/stage3/schema=stage3.3a-v1/run=20260803T141321876182Z-population --output-root data/pilot/26.15/eune/processed/stage3 --analysis-region EUNE --training-patch 26.14 --evaluation-patch 26.15 --l2-grid 0.01 0.1 1.0 --cv-folds 3 --seed 34001 --calibration-bins 10 --bootstrap-replicates 200 --bootstrap-seed 34101 --max-iterations 500 --optimizer-tolerance 1e-9 --expected-match-count 1000 --max-publication-bytes 5000000 --minimum-free-space-reserve-bytes 15371520659 --validate-only
+```
+
+Use separate EUW paths and `--analysis-region EUW`. See
+[docs/stage3_4a.md](docs/stage3_4a.md) for the schema, leakage controls, exact frozen
+26.16 settings, counterfactual contract, and storage gate.
+
+The prospective pre-26.16 contract is locked by platform under
+`config/evaluation/stage3.4a-pre-26.16-v1/`. It makes composition-only versus fixed
+0.5 paired match-level log loss primary, leaves direct matchups exploratory, and
+contains deterministic development-only sample-size evidence. See
+[docs/stage3_4a_freeze.md](docs/stage3_4a_freeze.md). No 26.16 outcome was used to
+create the freeze.
+
 ## Stage 2: controlled population sampling
 
 EUNE uses platform route `eun1` for League/Summoner endpoints and regional route

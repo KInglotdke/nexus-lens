@@ -1,0 +1,142 @@
+{
+  "accuracy_tie_convention": "probability_exactly_0.5_predicts_the_oriented_allied_team_outcome_1",
+  "analysis_region": "EUNE",
+  "contracts": {
+    "comparison_population": "identical_platform_specific_eligible_match_subset_for_all_policies",
+    "eligibility": "queue_420_complete_two_team_ten_participant_role_resolved_draft",
+    "evaluation_outcomes_in_fit_or_features": false,
+    "feature_encoding": "allied_plus_one_opposing_minus_one_champion_role; optional_signed_same_role_matchup",
+    "hyperparameter_scope": "frozen_before_evaluation",
+    "team_side": {
+      "can_represent_training_only_side_advantage": false,
+      "freeze_decision": "non_blocking_explicit_predictive_scope_limitation",
+      "observed_oriented_team_ids": [
+        100
+      ],
+      "representation": "metadata_only_no_explicit_model_feature",
+      "signed_side_feature_would_preserve_team_swap_complementarity": true
+    },
+    "team_swap": "complete_feature_vector_negated_probability_complemented",
+    "vocabulary_fit_scope": "training_patch_only"
+  },
+  "development_lineage": {
+    "stage3_1_input_sha256": {
+      "bans.jsonl": "0299e8fbcaa18218bbfeb2fd5dcc337fb875cebbc480a378d3537c36eb339e58",
+      "matches.jsonl": "00cd5ee7176e38d1d0f755a950c663daee6c8a0ac31cd07528e271cb9b66cbd4",
+      "metadata.json": "5e86ab182d1082f44284ee23478b9b7221480057942ae6ee1da1861bf3a56a14",
+      "participants.jsonl": "7237017d6411b0549b8c4da0f134d332d0d902dbeba1c4fc3ae6eb2b8da28d81",
+      "quality_report.json": "42025427b9e5812167c1d9c11e2febd1218b704e3f3db23e7c301f7356675e30",
+      "teams.jsonl": "896c488bd148da358e15d343c8e185e319416ea802dfd4a51f0fe55e8eb22807"
+    },
+    "stage3_2_input_sha256": {
+      "match_analysis_context.jsonl": "12e6da33a024c813d4439a21885fecc6f08c964a14c644bc507974d3bf2f1eb4",
+      "metadata.json": "d0f3b6d966d7a2e3ae34a756f5cbb5ad7fd867ba73b7b491665f270849383f14",
+      "participant_match_features.jsonl": "4920b9fc4d3e89a2d2ce1a616482333d7c80e5016f8951d2ef1dbb170611464e",
+      "quality_report.json": "2705cc727a2fd6288abc959e8f17baeaaae6690e2963d3c904f4ff52ebd92474",
+      "team_match_features.jsonl": "b2bd9e78ca8518f0e740f9a7f26772945d97bd07dc1450f7cb9d4cd9775836e1"
+    },
+    "stage3_3a_input_directory": "data/pilot/26.15/eune/processed/stage3/schema=stage3.3a-v1/run=20260803T141321876182Z-population",
+    "stage3_3a_input_sha256": {
+      "draft_observation_quality_report.json": "60691fa027c46cbd90308d44d8f23404c9e43a9acc5188037b66a5f4dcc7f0bc",
+      "match_draft_context.jsonl": "336c6c81f962488addb9481669868750e780a695f4e0eacf8448359975c38e47",
+      "metadata.json": "82328523c286866dcc6131728006e95b513ec182930750f4cd7c3cd9f8d19139",
+      "participant_draft_observations.jsonl": "8565ecee30d5dd47e00400f91685d830310e45144e9efdb05d3a30b576722166",
+      "team_draft_observations.jsonl": "5f72ac2689a31dacbe5a6fcc7d9c0c5044eec0f6c0b7be8e1d8c58a66ced8b59"
+    },
+    "stage3_4a_code_sha256": "c9bf95704977d68fad5116c90d6bfec7029dfd307be77297019da331a71bac25",
+    "stage3_4a_development_output_directory": "data/pilot/26.15/eune/processed/stage3/schema=stage3.4a-v1/run=20260803T141321876182Z-population__stage3.4a__c72aa74009be",
+    "stage3_4a_metadata_sha256": "a6c66b3c0808407234ca70c396666bb67ce72d7723762f4f33302016b614b35b",
+    "stage3_4a_output_sha256": {
+      "composition_metrics.json": "563e1de68aa8aab09115d3a0ceb136a196736faa1c7bd8a204b87090bf9722fd",
+      "composition_report.md": "80c791eaacf65203bcaa7a8de978683c2ddc443381c5dd20055624e841799ccf",
+      "model_artifacts.json": "f0b1cbd92863e689b48ded487a043633090810becaead2f508385addff5a03a7",
+      "quality_report.json": "a4f80e1e8cd16a89c896b6c4fd3304819be2c66073c51ce22fa647f5bcb1f3b6"
+    },
+    "stage3_4a_publication_tree_sha256": "1665b43714fbeb3e275466959671977809e8c5a1516d5e3b94e18584c63beb16"
+  },
+  "exact_stage3_4a_flags": [
+    "--training-patch",
+    "26.15",
+    "--evaluation-patch",
+    "26.16",
+    "--frozen-composition-only-l2",
+    "0.1",
+    "--frozen-composition-plus-matchups-l2",
+    "0.1",
+    "--seed",
+    "34001",
+    "--calibration-bins",
+    "10",
+    "--bootstrap-replicates",
+    "200",
+    "--bootstrap-seed",
+    "34101",
+    "--max-iterations",
+    "500",
+    "--optimizer-tolerance",
+    "1e-9"
+  ],
+  "exploratory_comparison": "composition_plus_lane_matchups_minus_composition_only",
+  "freeze_id": "stage3.4a-pre-26.16-v1",
+  "frozen_l2_strengths": {
+    "composition_only": 0.1,
+    "composition_plus_lane_matchups": 0.1
+  },
+  "future_evaluation_outcomes_observed": false,
+  "optimizer": {
+    "feature_scaling": null,
+    "implementation": "scipy.optimize.minimize",
+    "intercept": null,
+    "max_iterations": 500,
+    "method": "L-BFGS-B",
+    "prediction_clipping": null,
+    "tolerance": 1e-09
+  },
+  "patches": {
+    "evaluation": "26.16",
+    "training": "26.15"
+  },
+  "platform": "eun1",
+  "primary_comparison": {
+    "alpha_two_sided": 0.05,
+    "model": "composition_only",
+    "outcome_dependent_early_stopping": false,
+    "paired_difference": "composition_log_loss_minus_fixed_0_5_log_loss",
+    "platforms_evaluated_separately": true,
+    "primary_metric": "paired_match_level_log_loss",
+    "reference_baseline": "fixed_0_5",
+    "unit": "one_eligible_match"
+  },
+  "privacy_policy": {
+    "aggregate_and_model_parameter_outputs_only": true,
+    "player_names": false,
+    "prediction_or_match_rows_published": false,
+    "pseudonymous_player_keys": false,
+    "raw_riot_identifiers": false
+  },
+  "queue_id": 420,
+  "randomness": {
+    "calibration_bins": 10,
+    "metric_bootstrap_replicates": 200,
+    "metric_bootstrap_seed": 34101,
+    "model_seed": 34001
+  },
+  "sample_size_analysis": {
+    "path": "prospective_sample_size.json",
+    "sha256": "398e40b0b784c14cc79e1a266a34c3b319b62441108d779c974ad27f639bf62a"
+  },
+  "schema_version": "stage3.4a-pre-26.16-freeze-v1",
+  "secondary_metrics": [
+    "brier_score",
+    "calibration",
+    "accuracy_at_0_5"
+  ],
+  "software": {
+    "dependency_lock_path": "config/evaluation/stage3.4a-pre-26.16-v1.dependency-lock.txt",
+    "dependency_lock_sha256": "03e87094cf5591417eb57808e8bac3e5c187ef901ae875685a0871a12a811b18",
+    "numpy": "2.5.1",
+    "python": "3.12.10",
+    "scipy": "1.18.0"
+  },
+  "status": "frozen_before_26.16_evaluation"
+}

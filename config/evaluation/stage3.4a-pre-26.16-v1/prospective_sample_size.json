@@ -1,0 +1,699 @@
+{
+  "alpha_two_sided": 0.05,
+  "confidence_interval_width_method": "two_sided_student_t_width_using_development_paired_sample_sd",
+  "development_data_only": true,
+  "effect_sizes_mean_log_loss_improvement": [
+    0.0025,
+    0.005,
+    0.01
+  ],
+  "freeze_id": "stage3.4a-pre-26.16-v1",
+  "future_evaluation_outcomes_observed": false,
+  "operational_reserve_fraction": 0.1,
+  "outcome_dependent_early_stopping": false,
+  "platform_results": [
+    {
+      "analysis_region": "EUNE",
+      "development_fold": {
+        "eligibility_rate": 0.927007299270073,
+        "evaluation_eligible_matches": 381,
+        "evaluation_patch": "26.15",
+        "evaluation_total_matches": 411,
+        "match_sets_disjoint": true,
+        "one_observation_per_eligible_match": true,
+        "training_eligible_matches": 542,
+        "training_patch": "26.14"
+      },
+      "paired_log_loss": {
+        "composition_only_minus_fixed_0_5": {
+          "difference_definition": "model_log_loss_minus_comparator_log_loss",
+          "empirical_mean": 0.006538566125053561,
+          "empirical_quantiles": {
+            "0.0": -0.18541148778469074,
+            "0.05": -0.11153540761586556,
+            "0.25": -0.04023046818504894,
+            "0.5": 0.004756387045371957,
+            "0.75": 0.05618406148345012,
+            "0.95": 0.12581828224222524,
+            "1.0": 0.18332914229261654
+          },
+          "expected_confidence_interval_widths": [
+            {
+              "eligible_evaluation_matches": 1000,
+              "expected_two_sided_95_percent_ci_full_width": 0.008689688174935211
+            },
+            {
+              "eligible_evaluation_matches": 2500,
+              "expected_two_sided_95_percent_ci_full_width": 0.005491842761236309
+            },
+            {
+              "eligible_evaluation_matches": 5000,
+              "expected_two_sided_95_percent_ci_full_width": 0.003882378430788192
+            },
+            {
+              "eligible_evaluation_matches": 10000,
+              "expected_two_sided_95_percent_ci_full_width": 0.0027449237015475876
+            }
+          ],
+          "negative_mean_favors_first_named_model": true,
+          "paired_match_count": 381,
+          "power_requirements": [
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 7258,
+              "eligibility_inflated_accepted_matches": 6598,
+              "eligible_evaluation_matches": 6116,
+              "power": 0.8,
+              "true_mean_log_loss_improvement": 0.0025
+            },
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 9707,
+              "eligibility_inflated_accepted_matches": 8824,
+              "eligible_evaluation_matches": 8179,
+              "power": 0.9,
+              "true_mean_log_loss_improvement": 0.0025
+            },
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 1828,
+              "eligibility_inflated_accepted_matches": 1661,
+              "eligible_evaluation_matches": 1539,
+              "power": 0.8,
+              "true_mean_log_loss_improvement": 0.005
+            },
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 2412,
+              "eligibility_inflated_accepted_matches": 2192,
+              "eligible_evaluation_matches": 2032,
+              "power": 0.9,
+              "true_mean_log_loss_improvement": 0.005
+            },
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 461,
+              "eligibility_inflated_accepted_matches": 419,
+              "eligible_evaluation_matches": 388,
+              "power": 0.8,
+              "true_mean_log_loss_improvement": 0.01
+            },
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 615,
+              "eligibility_inflated_accepted_matches": 559,
+              "eligible_evaluation_matches": 518,
+              "power": 0.9,
+              "true_mean_log_loss_improvement": 0.01
+            }
+          ],
+          "sample_standard_deviation": 0.0700163741471246,
+          "sample_variance": 0.0049022926487101385
+        },
+        "composition_plus_matchup_minus_composition_only": {
+          "difference_definition": "model_log_loss_minus_comparator_log_loss",
+          "empirical_mean": 0.00032581149721236185,
+          "empirical_quantiles": {
+            "0.0": -0.0243722203290182,
+            "0.05": -0.015134729871837393,
+            "0.25": -0.005660474065616428,
+            "0.5": 0.00016603679700755158,
+            "0.75": 0.006088132899525922,
+            "0.95": 0.01591056052725015,
+            "1.0": 0.03704732942478284
+          },
+          "expected_confidence_interval_widths": [
+            {
+              "eligible_evaluation_matches": 1000,
+              "expected_two_sided_95_percent_ci_full_width": 0.0011780989547354086
+            },
+            {
+              "eligible_evaluation_matches": 2500,
+              "expected_two_sided_95_percent_ci_full_width": 0.0007445530940046598
+            },
+            {
+              "eligible_evaluation_matches": 5000,
+              "expected_two_sided_95_percent_ci_full_width": 0.000526350989715804
+            },
+            {
+              "eligible_evaluation_matches": 10000,
+              "expected_two_sided_95_percent_ci_full_width": 0.00037214128729605103
+            }
+          ],
+          "negative_mean_favors_first_named_model": true,
+          "paired_match_count": 381,
+          "power_requirements": [
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 139,
+              "eligibility_inflated_accepted_matches": 126,
+              "eligible_evaluation_matches": 116,
+              "power": 0.8,
+              "true_mean_log_loss_improvement": 0.0025
+            },
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 188,
+              "eligibility_inflated_accepted_matches": 170,
+              "eligible_evaluation_matches": 157,
+              "power": 0.9,
+              "true_mean_log_loss_improvement": 0.0025
+            },
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 38,
+              "eligibility_inflated_accepted_matches": 34,
+              "eligible_evaluation_matches": 31,
+              "power": 0.8,
+              "true_mean_log_loss_improvement": 0.005
+            },
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 50,
+              "eligibility_inflated_accepted_matches": 45,
+              "eligible_evaluation_matches": 41,
+              "power": 0.9,
+              "true_mean_log_loss_improvement": 0.005
+            },
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 13,
+              "eligibility_inflated_accepted_matches": 11,
+              "eligible_evaluation_matches": 10,
+              "power": 0.8,
+              "true_mean_log_loss_improvement": 0.01
+            },
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 17,
+              "eligibility_inflated_accepted_matches": 15,
+              "eligible_evaluation_matches": 13,
+              "power": 0.9,
+              "true_mean_log_loss_improvement": 0.01
+            }
+          ],
+          "sample_standard_deviation": 0.009492425451469758,
+          "sample_variance": 9.010614095171083e-05
+        }
+      },
+      "platform": "eun1",
+      "queue_id": 420,
+      "team_side": {
+        "can_represent_training_only_side_advantage": false,
+        "freeze_decision": "non_blocking_explicit_predictive_scope_limitation",
+        "observed_oriented_team_ids": [
+          100
+        ],
+        "representation": "metadata_only_no_explicit_model_feature",
+        "signed_side_feature_would_preserve_team_swap_complementarity": true
+      },
+      "training_adequacy": {
+        "champion_role_frequency_distribution": {
+          "0": 0,
+          "1": 90,
+          "10_19": 81,
+          "20_plus": 62,
+          "2_4": 82,
+          "5_9": 58
+        },
+        "champion_role_vocabulary_size": 373,
+        "currently_available_eligible_matches": 381,
+        "development_26_14_to_26_15_unseen_feature_rates": {
+          "composition_only": {
+            "match_rate_with_any_unseen_feature": 0.2099737532808399,
+            "matches_with_any_unseen_feature": 80,
+            "total_champion_role_slots": 3810,
+            "total_direct_matchups": null,
+            "unseen_champion_role_slot_rate": 0.024409448818897637,
+            "unseen_champion_role_slots": 93,
+            "unseen_direct_matchup_rate": null,
+            "unseen_direct_matchups": null
+          },
+          "composition_plus_lane_matchups": {
+            "match_rate_with_any_unseen_feature": 0.973753280839895,
+            "matches_with_any_unseen_feature": 371,
+            "total_champion_role_slots": 3810,
+            "total_direct_matchups": 1905,
+            "unseen_champion_role_slot_rate": 0.024409448818897637,
+            "unseen_champion_role_slots": 93,
+            "unseen_direct_matchup_rate": 0.5254593175853018,
+            "unseen_direct_matchups": 1001
+          }
+        },
+        "evaluation_size_cannot_repair_training": "more 26.16 evaluation matches narrow evaluation uncertainty but do not change 26.15 vocabulary, coefficient estimates, or unseen-feature rates",
+        "future_26_15_coefficient_dimensions": {
+          "composition_only": {
+            "coefficient_count": 373,
+            "coefficients_per_eligible_match": 0.979002624671916,
+            "eligible_matches": 381,
+            "training_frequency_distribution": {
+              "0": 0,
+              "1": 90,
+              "10_19": 81,
+              "20_plus": 62,
+              "2_4": 82,
+              "5_9": 58
+            }
+          },
+          "composition_plus_lane_matchups": {
+            "coefficient_count": 1793,
+            "coefficients_per_eligible_match": 4.706036745406824,
+            "eligible_matches": 381,
+            "training_frequency_distribution": {
+              "0": 0,
+              "1": 1182,
+              "10_19": 82,
+              "20_plus": 62,
+              "2_4": 400,
+              "5_9": 67
+            }
+          }
+        },
+        "future_training_patch": "26.15",
+        "match_grouped_learning_curves": {
+          "composition_only": [
+            {
+              "coefficient_cosine_similarity_to_full_model": 0.5149882323949778,
+              "coefficient_count": 271,
+              "common_coefficients_with_full_model": 271,
+              "evaluation_log_loss": 0.7074171800466416,
+              "prediction_correlation_with_full_model": 0.5395211492370473,
+              "prediction_mean_absolute_difference_from_full_model": 0.04159108635898456,
+              "training_fraction": 0.25,
+              "training_matches": 136
+            },
+            {
+              "coefficient_cosine_similarity_to_full_model": 0.7077703849733367,
+              "coefficient_count": 321,
+              "common_coefficients_with_full_model": 321,
+              "evaluation_log_loss": 0.7028328708102849,
+              "prediction_correlation_with_full_model": 0.7276450923495453,
+              "prediction_mean_absolute_difference_from_full_model": 0.027170037094708818,
+              "training_fraction": 0.5,
+              "training_matches": 271
+            },
+            {
+              "coefficient_cosine_similarity_to_full_model": 0.8842052980570408,
+              "coefficient_count": 359,
+              "common_coefficients_with_full_model": 359,
+              "evaluation_log_loss": 0.7030140599470708,
+              "prediction_correlation_with_full_model": 0.8851009863537884,
+              "prediction_mean_absolute_difference_from_full_model": 0.014707681845329832,
+              "training_fraction": 0.75,
+              "training_matches": 407
+            },
+            {
+              "coefficient_cosine_similarity_to_full_model": 1.0000000000000002,
+              "coefficient_count": 393,
+              "common_coefficients_with_full_model": 393,
+              "evaluation_log_loss": 0.6996857466849988,
+              "prediction_correlation_with_full_model": 1.0,
+              "prediction_mean_absolute_difference_from_full_model": 0.0,
+              "training_fraction": 1.0,
+              "training_matches": 542
+            }
+          ],
+          "composition_plus_lane_matchups": [
+            {
+              "coefficient_cosine_similarity_to_full_model": 0.5685655237409504,
+              "coefficient_count": 874,
+              "common_coefficients_with_full_model": 874,
+              "evaluation_log_loss": 0.7067837541982173,
+              "prediction_correlation_with_full_model": 0.5475506947948271,
+              "prediction_mean_absolute_difference_from_full_model": 0.040005368938399365,
+              "training_fraction": 0.25,
+              "training_matches": 136
+            },
+            {
+              "coefficient_cosine_similarity_to_full_model": 0.7501267891506658,
+              "coefficient_count": 1410,
+              "common_coefficients_with_full_model": 1410,
+              "evaluation_log_loss": 0.7024631604702101,
+              "prediction_correlation_with_full_model": 0.7359395899966714,
+              "prediction_mean_absolute_difference_from_full_model": 0.026948554607555783,
+              "training_fraction": 0.5,
+              "training_matches": 271
+            },
+            {
+              "coefficient_cosine_similarity_to_full_model": 0.9019661805685579,
+              "coefficient_count": 1865,
+              "common_coefficients_with_full_model": 1865,
+              "evaluation_log_loss": 0.703284867348101,
+              "prediction_correlation_with_full_model": 0.8875443848533776,
+              "prediction_mean_absolute_difference_from_full_model": 0.014979144482927666,
+              "training_fraction": 0.75,
+              "training_matches": 407
+            },
+            {
+              "coefficient_cosine_similarity_to_full_model": 1.0,
+              "coefficient_count": 2266,
+              "common_coefficients_with_full_model": 2266,
+              "evaluation_log_loss": 0.7000115581822112,
+              "prediction_correlation_with_full_model": 1.0,
+              "prediction_mean_absolute_difference_from_full_model": 0.0,
+              "training_fraction": 1.0,
+              "training_matches": 542
+            }
+          ]
+        },
+        "projection_scope": "descriptive_only; larger training sets should reduce unseen and sparse features, but no future performance is inferred"
+      }
+    },
+    {
+      "analysis_region": "EUW",
+      "development_fold": {
+        "eligibility_rate": 0.9353348729792148,
+        "evaluation_eligible_matches": 405,
+        "evaluation_patch": "26.15",
+        "evaluation_total_matches": 433,
+        "match_sets_disjoint": true,
+        "one_observation_per_eligible_match": true,
+        "training_eligible_matches": 533,
+        "training_patch": "26.14"
+      },
+      "paired_log_loss": {
+        "composition_only_minus_fixed_0_5": {
+          "difference_definition": "model_log_loss_minus_comparator_log_loss",
+          "empirical_mean": 0.00044400600500254183,
+          "empirical_quantiles": {
+            "0.0": -0.02318748534812254,
+            "0.05": -0.01211102607058263,
+            "0.25": -0.0039676396125675195,
+            "0.5": 0.0008680618402217011,
+            "0.75": 0.004614062817333342,
+            "0.95": 0.012460485427755727,
+            "1.0": 0.03095318565466676
+          },
+          "expected_confidence_interval_widths": [
+            {
+              "eligible_evaluation_matches": 1000,
+              "expected_two_sided_95_percent_ci_full_width": 0.0009318466687009481
+            },
+            {
+              "eligible_evaluation_matches": 2500,
+              "expected_two_sided_95_percent_ci_full_width": 0.0005889227874538349
+            },
+            {
+              "eligible_evaluation_matches": 5000,
+              "expected_two_sided_95_percent_ci_full_width": 0.00041633040617057186
+            },
+            {
+              "eligible_evaluation_matches": 10000,
+              "expected_two_sided_95_percent_ci_full_width": 0.0002943544066981973
+            }
+          ],
+          "negative_mean_favors_first_named_model": true,
+          "paired_match_count": 405,
+          "power_requirements": [
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 87,
+              "eligibility_inflated_accepted_matches": 79,
+              "eligible_evaluation_matches": 73,
+              "power": 0.8,
+              "true_mean_log_loss_improvement": 0.0025
+            },
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 114,
+              "eligibility_inflated_accepted_matches": 103,
+              "eligible_evaluation_matches": 96,
+              "power": 0.9,
+              "true_mean_log_loss_improvement": 0.0025
+            },
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 25,
+              "eligibility_inflated_accepted_matches": 22,
+              "eligible_evaluation_matches": 20,
+              "power": 0.8,
+              "true_mean_log_loss_improvement": 0.005
+            },
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 32,
+              "eligibility_inflated_accepted_matches": 29,
+              "eligible_evaluation_matches": 27,
+              "power": 0.9,
+              "true_mean_log_loss_improvement": 0.005
+            },
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 9,
+              "eligibility_inflated_accepted_matches": 8,
+              "eligible_evaluation_matches": 7,
+              "power": 0.8,
+              "true_mean_log_loss_improvement": 0.01
+            },
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 11,
+              "eligibility_inflated_accepted_matches": 10,
+              "eligible_evaluation_matches": 9,
+              "power": 0.9,
+              "true_mean_log_loss_improvement": 0.01
+            }
+          ],
+          "sample_standard_deviation": 0.007508269996581747,
+          "sample_variance": 5.637411834156967e-05
+        },
+        "composition_plus_matchup_minus_composition_only": {
+          "difference_definition": "model_log_loss_minus_comparator_log_loss",
+          "empirical_mean": -4.643089664945788e-05,
+          "empirical_quantiles": {
+            "0.0": -0.0036887119366869614,
+            "0.05": -0.001430660274802431,
+            "0.25": -0.0004888918273411313,
+            "0.5": -3.9200419792440044e-06,
+            "0.75": 0.00047595842565184565,
+            "0.95": 0.0014055795613421294,
+            "1.0": 0.0027782702156223804
+          },
+          "expected_confidence_interval_widths": [
+            {
+              "eligible_evaluation_matches": 1000,
+              "expected_two_sided_95_percent_ci_full_width": 0.0001176998521517434
+            },
+            {
+              "eligible_evaluation_matches": 2500,
+              "expected_two_sided_95_percent_ci_full_width": 7.438576252973028e-05
+            },
+            {
+              "eligible_evaluation_matches": 5000,
+              "expected_two_sided_95_percent_ci_full_width": 5.258593382199182e-05
+            },
+            {
+              "eligible_evaluation_matches": 10000,
+              "expected_two_sided_95_percent_ci_full_width": 3.717936792851328e-05
+            }
+          ],
+          "negative_mean_favors_first_named_model": true,
+          "paired_match_count": 405,
+          "power_requirements": [
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 6,
+              "eligibility_inflated_accepted_matches": 5,
+              "eligible_evaluation_matches": 4,
+              "power": 0.8,
+              "true_mean_log_loss_improvement": 0.0025
+            },
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 6,
+              "eligibility_inflated_accepted_matches": 5,
+              "eligible_evaluation_matches": 4,
+              "power": 0.9,
+              "true_mean_log_loss_improvement": 0.0025
+            },
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 5,
+              "eligibility_inflated_accepted_matches": 4,
+              "eligible_evaluation_matches": 3,
+              "power": 0.8,
+              "true_mean_log_loss_improvement": 0.005
+            },
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 5,
+              "eligibility_inflated_accepted_matches": 4,
+              "eligible_evaluation_matches": 3,
+              "power": 0.9,
+              "true_mean_log_loss_improvement": 0.005
+            },
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 5,
+              "eligibility_inflated_accepted_matches": 4,
+              "eligible_evaluation_matches": 3,
+              "power": 0.8,
+              "true_mean_log_loss_improvement": 0.01
+            },
+            {
+              "accepted_matches_with_10_percent_operational_reserve": 5,
+              "eligibility_inflated_accepted_matches": 4,
+              "eligible_evaluation_matches": 3,
+              "power": 0.9,
+              "true_mean_log_loss_improvement": 0.01
+            }
+          ],
+          "sample_standard_deviation": 0.0009483558810646457,
+          "sample_variance": 8.993788771499005e-07
+        }
+      },
+      "platform": "euw1",
+      "queue_id": 420,
+      "team_side": {
+        "can_represent_training_only_side_advantage": false,
+        "freeze_decision": "non_blocking_explicit_predictive_scope_limitation",
+        "observed_oriented_team_ids": [
+          100
+        ],
+        "representation": "metadata_only_no_explicit_model_feature",
+        "signed_side_feature_would_preserve_team_swap_complementarity": true
+      },
+      "training_adequacy": {
+        "champion_role_frequency_distribution": {
+          "0": 0,
+          "1": 105,
+          "10_19": 82,
+          "20_plus": 70,
+          "2_4": 78,
+          "5_9": 62
+        },
+        "champion_role_vocabulary_size": 397,
+        "currently_available_eligible_matches": 405,
+        "development_26_14_to_26_15_unseen_feature_rates": {
+          "composition_only": {
+            "match_rate_with_any_unseen_feature": 0.16296296296296298,
+            "matches_with_any_unseen_feature": 66,
+            "total_champion_role_slots": 4050,
+            "total_direct_matchups": null,
+            "unseen_champion_role_slot_rate": 0.017530864197530863,
+            "unseen_champion_role_slots": 71,
+            "unseen_direct_matchup_rate": null,
+            "unseen_direct_matchups": null
+          },
+          "composition_plus_lane_matchups": {
+            "match_rate_with_any_unseen_feature": 0.9827160493827161,
+            "matches_with_any_unseen_feature": 398,
+            "total_champion_role_slots": 4050,
+            "total_direct_matchups": 2025,
+            "unseen_champion_role_slot_rate": 0.017530864197530863,
+            "unseen_champion_role_slots": 71,
+            "unseen_direct_matchup_rate": 0.5293827160493827,
+            "unseen_direct_matchups": 1072
+          }
+        },
+        "evaluation_size_cannot_repair_training": "more 26.16 evaluation matches narrow evaluation uncertainty but do not change 26.15 vocabulary, coefficient estimates, or unseen-feature rates",
+        "future_26_15_coefficient_dimensions": {
+          "composition_only": {
+            "coefficient_count": 397,
+            "coefficients_per_eligible_match": 0.980246913580247,
+            "eligible_matches": 405,
+            "training_frequency_distribution": {
+              "0": 0,
+              "1": 105,
+              "10_19": 82,
+              "20_plus": 70,
+              "2_4": 78,
+              "5_9": 62
+            }
+          },
+          "composition_plus_lane_matchups": {
+            "coefficient_count": 1936,
+            "coefficients_per_eligible_match": 4.780246913580247,
+            "eligible_matches": 405,
+            "training_frequency_distribution": {
+              "0": 0,
+              "1": 1313,
+              "10_19": 82,
+              "20_plus": 70,
+              "2_4": 394,
+              "5_9": 77
+            }
+          }
+        },
+        "future_training_patch": "26.15",
+        "match_grouped_learning_curves": {
+          "composition_only": [
+            {
+              "coefficient_cosine_similarity_to_full_model": 0.4737234353719444,
+              "coefficient_count": 311,
+              "common_coefficients_with_full_model": 311,
+              "evaluation_log_loss": 0.6933848920065904,
+              "prediction_correlation_with_full_model": 0.47575358449433386,
+              "prediction_mean_absolute_difference_from_full_model": 0.005672190468802123,
+              "training_fraction": 0.25,
+              "training_matches": 134
+            },
+            {
+              "coefficient_cosine_similarity_to_full_model": 0.7032003809294691,
+              "coefficient_count": 370,
+              "common_coefficients_with_full_model": 370,
+              "evaluation_log_loss": 0.6931072841074968,
+              "prediction_correlation_with_full_model": 0.701218858860277,
+              "prediction_mean_absolute_difference_from_full_model": 0.003117729746959045,
+              "training_fraction": 0.5,
+              "training_matches": 267
+            },
+            {
+              "coefficient_cosine_similarity_to_full_model": 0.8699096094691255,
+              "coefficient_count": 412,
+              "common_coefficients_with_full_model": 412,
+              "evaluation_log_loss": 0.6934677965466768,
+              "prediction_correlation_with_full_model": 0.85743806986841,
+              "prediction_mean_absolute_difference_from_full_model": 0.0020131346651760264,
+              "training_fraction": 0.75,
+              "training_matches": 400
+            },
+            {
+              "coefficient_cosine_similarity_to_full_model": 0.9999999999999998,
+              "coefficient_count": 438,
+              "common_coefficients_with_full_model": 438,
+              "evaluation_log_loss": 0.693591186564948,
+              "prediction_correlation_with_full_model": 0.9999999999999999,
+              "prediction_mean_absolute_difference_from_full_model": 0.0,
+              "training_fraction": 1.0,
+              "training_matches": 533
+            }
+          ],
+          "composition_plus_lane_matchups": [
+            {
+              "coefficient_cosine_similarity_to_full_model": 0.5496010058779468,
+              "coefficient_count": 931,
+              "common_coefficients_with_full_model": 931,
+              "evaluation_log_loss": 0.6933100666286643,
+              "prediction_correlation_with_full_model": 0.47181617978010415,
+              "prediction_mean_absolute_difference_from_full_model": 0.005853326374785085,
+              "training_fraction": 0.25,
+              "training_matches": 134
+            },
+            {
+              "coefficient_cosine_similarity_to_full_model": 0.7565580157788269,
+              "coefficient_count": 1496,
+              "common_coefficients_with_full_model": 1496,
+              "evaluation_log_loss": 0.6929943263297401,
+              "prediction_correlation_with_full_model": 0.7021337536664732,
+              "prediction_mean_absolute_difference_from_full_model": 0.003220244890803653,
+              "training_fraction": 0.5,
+              "training_matches": 267
+            },
+            {
+              "coefficient_cosine_similarity_to_full_model": 0.8935871642878951,
+              "coefficient_count": 1991,
+              "common_coefficients_with_full_model": 1991,
+              "evaluation_log_loss": 0.693405020612935,
+              "prediction_correlation_with_full_model": 0.8574856785194391,
+              "prediction_mean_absolute_difference_from_full_model": 0.0020518564051008456,
+              "training_fraction": 0.75,
+              "training_matches": 400
+            },
+            {
+              "coefficient_cosine_similarity_to_full_model": 0.9999999999999999,
+              "coefficient_count": 2424,
+              "common_coefficients_with_full_model": 2424,
+              "evaluation_log_loss": 0.6935447556682984,
+              "prediction_correlation_with_full_model": 0.9999999999999999,
+              "prediction_mean_absolute_difference_from_full_model": 0.0,
+              "training_fraction": 1.0,
+              "training_matches": 533
+            }
+          ]
+        },
+        "projection_scope": "descriptive_only; larger training sets should reduce unseen and sparse features, but no future performance is inferred"
+      }
+    }
+  ],
+  "platforms_pooled": false,
+  "power_method": {
+    "base_seed": 34201,
+    "name": "deterministic_centered_empirical_residual_bootstrap",
+    "replicates": 10000,
+    "test": "two_sided_student_t_on_paired_match_level_mean"
+  },
+  "power_targets": [
+    0.8,
+    0.9
+  ],
+  "schema_version": "stage3.4a-prospective-analysis-v1",
+  "status": "prospective_development_only"
+}

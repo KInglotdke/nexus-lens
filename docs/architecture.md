@@ -39,7 +39,13 @@ Stage 2 population sample ─┘              |
              Stage 3.3B matchup/synergy sufficient statistics
                                           |
                                           v
-                 future calibrated recommendation evidence
+              Stage 3.3C patch-forward offline backtesting
+                                          |
+                                          v
+          Stage 3.4A composition-aware match-level modelling
+                                          |
+                                          v
+             future calibration and recommendation policy
 ```
 
 Only explicit collection and inspection commands load `.env` or contact Riot.
@@ -225,6 +231,77 @@ recommendation scoring.
 Publication stages all five files before atomic replacement. Existing output rejects
 changed Stage 3.3A lineage, validation-only mode writes nothing, and byte-identical
 reruns leave the directory unchanged.
+
+## Stage 3.3C evaluation boundary
+
+Stage 3.3C reads one hash-verified Stage 3.3A platform at a time. Match public patch
+defines rolling-origin folds: all training patches must compare numerically earlier
+than the evaluation patch, and all rows from one match share its split. Evaluation
+and training match-set digests are recorded and their intersection must be empty.
+Queue 420, a single platform, and an explicit analysis region are required.
+
+Reference policy fitting consumes only training participants. Prediction consumes
+champion, role, directional opponent/ally context, and training sufficient
+statistics; it cannot consume the evaluation outcome. Outcome joins occur only in
+the metric layer. The framework retains directional matchup and focal-with-ally
+semantics and exposes extension points for a later composition policy without
+implementing one.
+
+Aggregate metrics include log loss, Brier score, accuracy at the recorded 0.5
+threshold, calibration bins/ECE, coverage and abstention, missingness, training
+evidence buckets, champion-role frequency buckets, patch/platform/role slices, and
+optional deterministic match-cluster bootstrap intervals. Clipping is never
+implicit. Undefined non-finite log loss is represented as null with a reason, and no
+published value may be NaN or infinite.
+
+Stage 3.3C publications are aggregate-only, deterministic, schema/run versioned,
+atomically staged, and immutable. Validation-only mode writes nothing; unequal
+existing output fails rather than replacing it. Exact Stage 3.1/3.2/3.3A hashes,
+configuration, schema/policy/code versions, and output hashes are recorded. Player
+keys, raw Riot identifiers, names, and match identifiers are not published.
+
+The `26.14 -> 26.15` EUNE/EUW evaluations are explicitly non-calibrating mechanical
+smoke tests. Platforms and patches are never pooled, and no metric selects a
+baseline, prior, policy, reliability threshold, or recommendation. Full details are
+in `docs/stage3_3c.md`.
+
+The companion storage audit is read-only. It inventories raw, checkpoint, catalog,
+normalized, stage, lineage, and report bytes; computes exact canary/pilot file
+overlap by SHA-256 and size; records pilot operational sources physically shared
+under canary roots; and projects linear 10,000-match storage plus one temporary
+derived-publication copy and a 10% margin. Moving roots, compression, and
+derived-artifact retention remain proposals only.
+
+## Stage 3.4A composition boundary
+
+Stage 3.4A converts complete role-resolved Stage 3.3A matches into one oriented
+five-versus-five draft row. Champion-role composition features are allied-minus-
+opposing. Same-role matchup features use one unordered champion pair with a signed
+allied orientation. A team swap negates every feature. No-intercept logistic models
+therefore complement probability without fitting or correction.
+
+Vocabulary and regularization selection are training-only. Candidate strengths use
+seeded balanced match folds of 26.14, and each fold builds its own vocabulary. SciPy
+L-BFGS-B fits sparse L2 models deterministically. There is no scaling or clipping;
+unseen champion-role and matchup features contribute zero. EUNE/EUW models, metrics,
+and artifacts never share a fit.
+
+The match-level counterfactual boundary accepts one candidate replacement and keeps
+nine role-attached slots fixed. It returns comparable probabilities and an unchanged-
+slot hash, not a ranked list, recommendation, causal estimate, or lane-dominance
+claim.
+
+Publications contain aggregate metrics and privacy-safe model parameters, never
+prediction rows or match/player identifiers. Input hashes, configuration, code,
+model vocabulary, coefficients, and output hashes are versioned. Atomic immutable
+publication, validate-only, failed-write prevention, and a pre-publication storage
+reserve apply before any file appears.
+
+The Stage 3.4A pre-26.16 freeze is a separate tracked control artifact. It records
+platform-specific fixed L2 values, the exact future argv, paired-log-loss primary
+hypothesis, secondary/exploratory labels, dependency and lineage hashes, and a
+development-only prospective power analysis. It publishes no match-level rows and
+cannot be regenerated from future outcomes without producing a different freeze.
 
 ## Forward collection lineage
 

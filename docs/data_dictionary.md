@@ -335,6 +335,110 @@ sample, evidence-based patch stopping, calibration, major-change history policy,
 causal synergy controls remain null/unresolved. Therefore, these files prepare
 calibration and backtesting but do not establish reliable counter recommendations.
 
+## Stage 3.3C offline backtest (`stage3.3c-v1`)
+
+Stage 3.3C output is aggregate-only. No prediction-level row file is published, so
+match IDs, player keys, raw identifiers, and player names are absent.
+
+### `backtest_metrics.json`
+
+The root records `stage3.3c-metrics-v1`, policy contract, experimental/unresolved
+status, platform, explicit analysis region, queue 420, and ordered rolling-origin
+folds. Each fold contains evaluation patch, strictly earlier training patches,
+training/evaluation match counts and set digests, and reference-policy results.
+
+Each policy result records overall candidate/evaluated/abstained rows, coverage,
+abstention rate, log loss and its nullable undefined reason, Brier score, accuracy at
+0.5, ECE, equal-width calibration bins, missing reasons, and optional deterministic
+match-cluster bootstrap intervals. Slice tables repeat metrics by public patch,
+platform, role, champion-role training frequency, and pair-training evidence.
+Evidence buckets are descriptive only: `0_unseen`, `1`, `2_4`, `5_9`, `10_19`, and
+`20_plus`.
+
+### `quality_report.json`
+
+The report stores strict chronological, match-disjoint, training-fit, platform, and
+queue leakage checks; invariant failures; experimental/smoke/statistical-sufficiency
+flags; policy-selection/recommendation readiness; and aggregate-only privacy facts.
+
+### `metadata.json`
+
+Metadata records Stage 3.3C schema, metric, quality, reference-policy and code
+versions; implementation SHA-256; deterministic run/config hash; all Stage
+3.1/3.2/3.3A lineage hashes; explicit parameters; output directory; and SHA-256 for
+the metrics, quality, and Markdown report. It omits its own hash.
+
+### `backtest_report.md`
+
+The human-readable report names all metric denominators and explicit thresholds,
+lists fold sizes and aggregate policy metrics, reiterates leakage status, and marks
+policy selection and recommendations false. It contains no prediction-level data.
+
+## Stage 3.3C storage audit (`stage3.3c-storage-audit-v1`)
+
+The read-only audit JSON inventories physical and shared-source file counts/bytes by
+component and scenario/platform, bytes per accepted match, exact canary/pilot file
+duplication, a linear 10,000-match projection, one temporary
+normalized/Stage-3/lineage publication copy, 10% headroom margin, current free-space
+point estimate, and non-executed retention guidance. It is printed to stdout and
+does not create an artifact unless a caller explicitly redirects it.
+
+## Stage 3.4A composition model (`stage3.4a-v1`)
+
+Stage 3.4A publishes match-level aggregate metrics and model parameters. It does not
+publish match observations or prediction rows.
+
+### `composition_metrics.json`
+
+Records platform, explicit analysis region, queue 420, training/evaluation patches,
+total and role-complete match counts, and four policy results. Each result contains
+coverage/abstention, log loss, Brier, accuracy at 0.5, calibration bins/ECE,
+match-cluster intervals, missing reasons, and slices by patch, platform, minimum
+training champion-role frequency, and meaningful model evidence.
+
+### `model_artifacts.json`
+
+Contains aggregate training champion-role games/wins/rates and two fitted model
+records. Each model records variant, selected or pre-frozen L2 strength, training-
+only CV scores and fold-vocabulary hashes, optimizer facts, full vocabulary hash,
+training match-set digest, and ordered feature coefficient rows with training counts.
+Composition keys contain role and champion ID. Lane-matchup keys contain role,
+ordered public champion IDs, and explicit orientation sign semantics.
+
+No intercept, outcome feature, player value, or evaluation-fit vocabulary exists.
+Unknown features have zero contribution.
+
+### `quality_report.json`
+
+Records eligibility/exclusion counts, chronological and match-disjoint checks,
+training-only hyperparameter/vocabulary scopes, absence of preprocessing, team-swap
+and ordering invariants, seeds, model dimensions, queue/platform isolation, privacy,
+and unresolved readiness statuses.
+
+### `composition_report.md` and `metadata.json`
+
+The Markdown report contains concise aggregate metrics and non-calibrating warnings.
+Metadata records Stage 3.4A schema/policy/code versions and code hash, exact Stage
+3.1/3.2/3.3A hashes, complete deterministic configuration, output hashes, and
+immutable directory. Runtime free-space observations are intentionally excluded from
+deterministic metadata.
+
+## Stage 3.4A pre-26.16 freeze (`stage3.4a-pre-26.16-freeze-v1`)
+
+The tracked `eune.freeze.json` and `euw.freeze.json` records contain exact future
+patches, flags, frozen strengths, optimizer/seeds, primary and secondary metric
+contracts, feature/eligibility/team-side limitations, verified development lineage,
+software versions, dependency-lock hash, privacy policy, and the prospective-analysis
+hash. Status is `frozen_before_26.16_evaluation`, and the future-outcomes-observed
+field is false.
+
+`prospective_sample_size.json` contains separate platform paired-difference moments
+and quantiles, deterministic bootstrap power requirements, eligibility and reserve
+inflation, expected confidence-interval widths, unseen-feature diagnostics,
+coefficient density, and match-grouped learning curves. It contains aggregate
+development statistics only: no match IDs, prediction rows, player keys, names, or
+raw Riot identifiers.
+
 ## Collection lineage sidecar (`lineage-v1`)
 
 This sidecar references immutable Stage 3.1, 3.2, 3.3A, and 3.3B artifacts by path
