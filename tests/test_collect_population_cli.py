@@ -1,3 +1,5 @@
+import argparse
+import json
 from pathlib import Path
 
 import pytest
@@ -9,7 +11,9 @@ from nexus_lens.riot_client import (
     RiotRequestBudgetExceeded,
     RiotRetryExhausted,
 )
+from scripts.build_canonical_tables import _accepted_patch_counts
 from scripts.collect_population import (
+    make_config,
     recover_missing_request_budget,
     sanitized_collection_error,
 )
@@ -84,3 +88,65 @@ def test_interrupted_checkpoint_gets_conservative_request_charge(
         "method": "conservative_upper_bound",
         "charged_attempts": 60,
     }
+
+
+def test_single_platform_plan_config_drives_live_collector_roots(
+    tmp_path: Path,
+) -> None:
+    config_path = tmp_path / "canary.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "platforms": ["euw1"],
+                "target_public_patch": "26.15",
+                "patch_window_size": 2,
+                "target_matches_per_platform": 100,
+                "max_players_per_platform": 250,
+                "max_match_ids_per_platform": 2500,
+                "max_requests_per_platform": 2000,
+                "raw_root": "isolated/raw",
+                "processed_root": "isolated/processed",
+                "snapshot_root": "isolated/snapshots",
+            }
+        ),
+        encoding="utf-8",
+    )
+    args = argparse.Namespace(
+        config=config_path,
+        raw_dir=Path("wrong/raw"),
+        processed_dir=Path("wrong/processed"),
+        state_dir=Path("wrong/snapshots"),
+    )
+
+    config = make_config(args)
+
+    assert config.platform == "euw1"
+    assert config.regional_routing == "europe"
+    assert config.analysis_region == "euw"
+    assert config.accepted_public_patches == ("26.15", "26.14")
+    assert config.target_matches == 100
+    assert config.non_sensitive_dict()["queue_id"] == 420
+    assert args.raw_dir == Path("isolated/raw")
+    assert args.processed_dir == Path("isolated/processed")
+    assert args.state_dir == Path("isolated/snapshots")
+
+
+def test_stage31_patch_expectation_comes_from_completed_manifest(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "manifest.json"
+    path.write_text(
+        json.dumps(
+            {
+                "summary": {
+                    "accepted_matches_by_public_patch": {
+                        "26.14": 37,
+                        "26.15": 63,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert _accepted_patch_counts(path) == {"26.14": 37, "26.15": 63}

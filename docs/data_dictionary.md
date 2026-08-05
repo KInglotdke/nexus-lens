@@ -25,8 +25,9 @@
 - `win`, kills/deaths/assists, KDA, kill participation, CS, gold, vision, warding,
   damage, mitigation, healing, crowd control, summoner spell IDs, rune/perk IDs, and
   item slots 0–6 support initial analyses.
-- `puuid`: sensitive internal key retained only for consented cross-match discovery
-  and deduplication. It must never enter reports, console output, or Git.
+- `player_key`: stable project-scoped pseudonym used for local cross-match joins.
+  Raw PUUID remains limited to ignored raw/checkpoint state and is not written to
+  current normalized participant records, reports, console output, or Git.
 
 ## Team record
 

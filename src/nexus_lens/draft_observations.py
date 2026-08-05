@@ -22,7 +22,6 @@ from nexus_lens.analytics import (
     CANONICAL_POSITIONS,
     EXPECTED_MATCH_COUNT,
     EXPECTED_PARTICIPANT_COUNT,
-    EXPECTED_PATCH_COUNTS,
     EXPECTED_TEAM_COUNT,
     FORMULA_CONTRACT_VERSION,
     MatchAnalysisContext,
@@ -30,6 +29,7 @@ from nexus_lens.analytics import (
     Stage31Input,
     TeamMatchFeature,
     load_stage3_1_input,
+    stage3_1_patch_counts,
 )
 from nexus_lens.canonical import (
     CANONICAL_SCHEMA_VERSION,
@@ -240,7 +240,13 @@ def run_stage3_3a(
 ) -> DraftObservationDataset:
     """Validate prior stages, build observations, and optionally publish them."""
 
-    expected_patches = dict(expected_patch_counts or EXPECTED_PATCH_COUNTS)
+    expected_patches = dict(
+        expected_patch_counts
+        if expected_patch_counts is not None
+        else stage3_1_patch_counts(
+            stage3_1_directory, expected_match_count=expected_match_count
+        )
+    )
     stage31 = load_stage3_1_input(
         stage3_1_directory,
         expected_match_count=expected_match_count,

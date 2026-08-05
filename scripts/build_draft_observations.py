@@ -3,6 +3,7 @@
 import argparse
 from pathlib import Path
 
+from nexus_lens.analytics import EXPECTED_MATCH_COUNT
 from nexus_lens.canonical import Stage3ValidationError
 from nexus_lens.draft_observations import DraftObservationDataset, run_stage3_3a
 
@@ -41,6 +42,12 @@ def parse_args() -> argparse.Namespace:
         help="Versioned Stage 3.3A output root (default: data/processed/stage3).",
     )
     parser.add_argument(
+        "--expected-match-count",
+        type=int,
+        default=EXPECTED_MATCH_COUNT,
+        help="Required input match count (default: 100).",
+    )
+    parser.add_argument(
         "--validate-only",
         "--dry-run",
         action="store_true",
@@ -57,6 +64,10 @@ def main() -> int:
             stage3_2_directory=args.stage3_2_run,
             output_root=args.output_dir,
             validate_only=args.validate_only,
+            expected_match_count=args.expected_match_count,
+            expected_participant_count=args.expected_match_count * 10,
+            expected_team_count=args.expected_match_count * 2,
+            expected_ban_count=args.expected_match_count * 10,
         )
     except Stage3ValidationError as error:
         print(f"Stage 3.3A validation failed: category={error.category}.")

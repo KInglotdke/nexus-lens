@@ -10,6 +10,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from nexus_lens.catalog import ProcessingCatalog
+from nexus_lens.collection_planning import load_expanded_collection_config
 from nexus_lens.config import Settings
 from nexus_lens.population import (
     DEFAULT_DIVISIONS,
@@ -39,8 +40,16 @@ def parse_args() -> argparse.Namespace:
             "from official Riot APIs."
         )
     )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        help=(
+            "Single-platform expanded-collection JSON configuration. When set, "
+            "collection settings and storage roots come from this file."
+        ),
+    )
     parser.add_argument("--platform", default="eun1", choices=("eun1", "euw1"))
-    parser.add_argument("--target-public-patch", required=True, metavar="PATCH")
+    parser.add_argument("--target-public-patch", metavar="PATCH")
     parser.add_argument(
         "--patch-window-size",
         type=int,
@@ -104,6 +113,18 @@ def parse_args() -> argparse.Namespace:
 
 
 def make_config(args: argparse.Namespace) -> PopulationConfig:
+    if args.config is not None:
+        expanded = load_expanded_collection_config(args.config)
+        if len(expanded.platforms) != 1:
+            raise ValueError(
+                "live collection configuration must contain exactly one platform"
+            )
+        args.raw_dir = expanded.raw_root
+        args.processed_dir = expanded.processed_root
+        args.state_dir = expanded.snapshot_root
+        return expanded.population_config(expanded.platforms[0])
+    if args.target_public_patch is None:
+        raise ValueError("--target-public-patch is required without --config")
     target = args.target_matches
     max_players = args.max_players
     max_match_ids = args.max_match_ids

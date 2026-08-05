@@ -68,6 +68,15 @@ def parse_args() -> argparse.Namespace:
             "using public-patch fields; legacy derived files remain compatible."
         ),
     )
+    parser.add_argument(
+        "--validate-only",
+        "--dry-run",
+        action="store_true",
+        help=(
+            "Parse, normalize, and validate every selected payload without "
+            "writing normalized records, catalog state, or reports."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -83,15 +92,20 @@ def main() -> int:
     except (FileNotFoundError, ValueError) as error:
         raise SystemExit(str(error)) from error
 
-    catalog_path = args.catalog or args.processed_dir / "catalog.sqlite3"
+    catalog_path = (
+        Path(":memory:")
+        if args.validate_only
+        else args.catalog or args.processed_dir / "catalog.sqlite3"
+    )
     report_dir = args.report_dir or args.processed_dir / "reports"
     with ProcessingCatalog(catalog_path) as catalog:
         summary = SnapshotProcessor(
             processed_root=args.processed_dir,
             catalog=catalog,
             migrate_stage1=args.migrate_stage1,
+            validate_only=args.validate_only,
         ).process(snapshots)
-        if args.report != "none":
+        if args.report != "none" and not args.validate_only:
             formats = (
                 {"json", "markdown"} if args.report == "both" else {args.report}
             )
@@ -102,12 +116,14 @@ def main() -> int:
             )
             write_feasibility_reports(report, report_dir, formats)
 
-    _print_summary(summary.as_dict())
+    _print_summary(summary.as_dict(), validate_only=args.validate_only)
     return 0
 
 
-def _print_summary(summary: dict[str, object]) -> None:
+def _print_summary(summary: dict[str, object], *, validate_only: bool) -> None:
     print("Nexus Lens snapshot processing summary")
+    mode = "validation only; no files written" if validate_only else "published"
+    print(f"  mode: {mode}")
     print(f"  snapshots examined: {summary['snapshots_examined']}")
     print(f"  matches discovered: {summary['matches_discovered']}")
     print(f"  newly processed: {summary['newly_processed_matches']}")

@@ -41,6 +41,12 @@ def parse_args() -> argparse.Namespace:
         default=Path("data/processed/lineage"),
     )
     parser.add_argument(
+        "--expected-match-count",
+        type=int,
+        default=100,
+        help="Required Stage 3.1 match count (default: 100).",
+    )
+    parser.add_argument(
         "--validate-only",
         "--dry-run",
         action="store_true",
@@ -59,6 +65,7 @@ def main() -> int:
             manifest_path=args.manifest,
             output_root=args.output_root,
             validate_only=args.validate_only,
+            expected_match_count=args.expected_match_count,
         )
     except Stage3ValidationError as error:
         print(f"Lineage validation failed [{error.category}]: {error}")

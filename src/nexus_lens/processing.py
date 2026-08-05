@@ -54,10 +54,13 @@ class SnapshotProcessor:
         processed_root: Path,
         catalog: ProcessingCatalog,
         migrate_stage1: bool = False,
+        validate_only: bool = False,
     ) -> None:
         self._processed_root = processed_root
         self._catalog = catalog
         self._migrate_stage1 = migrate_stage1
+        self._validate_only = validate_only
+        self._validated_match_ids: set[str] = set()
 
     def process(self, snapshot_dirs: list[Path]) -> ProcessingSummary:
         summary = ProcessingSummary()
@@ -123,22 +126,27 @@ class SnapshotProcessor:
         match_id = str(metadata.get("matchId") or fallback_match_id)
         queue_value = info.get("queueId")
         queue_id = queue_value if isinstance(queue_value, int) else None
-        if self._catalog.is_processed(match_id) and not (
+        if self._validate_only and match_id in self._validated_match_ids:
+            summary.already_processed_matches += 1
+            return
+        if not self._validate_only and self._catalog.is_processed(match_id) and not (
             self._migrate_stage1 and self._catalog.needs_patch_migration(match_id)
         ):
             summary.already_processed_matches += 1
             return
 
-        self._catalog.begin_processing(
-            match_id=match_id,
-            routing_region=routing_region,
-            source_snapshot=source_snapshot,
-            queue_id=queue_id,
-        )
+        if not self._validate_only:
+            self._catalog.begin_processing(
+                match_id=match_id,
+                routing_region=routing_region,
+                source_snapshot=source_snapshot,
+                queue_id=queue_id,
+            )
         try:
             raw_match = RiotMatch.model_validate(raw_payload)
             batch = normalize_match(raw_match)
-            write_normalized_batch(self._processed_root, routing_region, batch)
+            if not self._validate_only:
+                write_normalized_batch(self._processed_root, routing_region, batch)
         except ValidationError:
             self._reject(
                 match_id=match_id,
@@ -173,17 +181,20 @@ class SnapshotProcessor:
             )
             return
 
-        self._catalog.record_processed(
-            match_id=match_id,
-            routing_region=routing_region,
-            api_game_version=batch.match.api_game_version,
-            api_patch=batch.match.api_patch,
-            public_patch=batch.match.public_patch,
-            patch_resolution_method=batch.match.patch_resolution_method,
-            patch_resolution_status=batch.match.patch_resolution_status,
-            queue_id=batch.match.queue_id,
-            source_snapshot=source_snapshot,
-        )
+        if self._validate_only:
+            self._validated_match_ids.add(match_id)
+        else:
+            self._catalog.record_processed(
+                match_id=match_id,
+                routing_region=routing_region,
+                api_game_version=batch.match.api_game_version,
+                api_patch=batch.match.api_patch,
+                public_patch=batch.match.public_patch,
+                patch_resolution_method=batch.match.patch_resolution_method,
+                patch_resolution_status=batch.match.patch_resolution_status,
+                queue_id=batch.match.queue_id,
+                source_snapshot=source_snapshot,
+            )
         summary.newly_processed_matches += 1
         summary.participant_rows_written += len(batch.participants)
         summary.team_rows_written += len(batch.teams)
@@ -202,14 +213,15 @@ class SnapshotProcessor:
         reason: str,
         summary: ProcessingSummary,
     ) -> None:
-        self._catalog.record_rejected(
-            match_id=match_id,
-            routing_region=routing_region,
-            source_snapshot=source_snapshot,
-            queue_id=queue_id,
-            failure_code=code,
-            failure_reason=reason,
-        )
+        if not self._validate_only:
+            self._catalog.record_rejected(
+                match_id=match_id,
+                routing_region=routing_region,
+                source_snapshot=source_snapshot,
+                queue_id=queue_id,
+                failure_code=code,
+                failure_reason=reason,
+            )
         summary.rejected_matches += 1
         summary.failure_reasons[code] += 1
 

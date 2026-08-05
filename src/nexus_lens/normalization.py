@@ -3,6 +3,7 @@
 from datetime import UTC, datetime
 
 from nexus_lens.patches import resolve_patch
+from nexus_lens.privacy import pseudonymize_puuid
 from nexus_lens.schemas import (
     RANKED_SOLO_QUEUE_ID,
     MatchParticipant,
@@ -170,7 +171,7 @@ def _normalize_participant(
         item_4=participant.item4,
         item_5=participant.item5,
         item_6=participant.item6,
-        puuid=participant.puuid,
+        player_key=pseudonymize_puuid(participant.puuid),
     )
 
 

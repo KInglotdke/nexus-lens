@@ -376,6 +376,13 @@ seed rank and timestamp, discovery timestamp/source, and every match-to-seed
 relationship. The aggregate manifest records only the policy/version flag; it does
 not expose player keys.
 
+The authorized patch-26.15 dual-platform pilot preserves the 100-match Stage 3 and
+lineage publications and derives the 1,000-match publications under separate local
+pilot roots. Its non-sensitive artifact-lifecycle record is in
+[docs/pilot_26_15.md](docs/pilot_26_15.md). Expanded offline stage commands use
+`--expected-match-count 1000`; normalization supports `--validate-only` and writes
+neither normalized data, catalog state, nor reports in that mode.
+
 ## Stage 2: controlled population sampling
 
 EUNE uses platform route `eun1` for League/Summoner endpoints and regional route
@@ -534,8 +541,9 @@ synergy, balance, population, or recommendation conclusions.
 
 Raw responses and population checkpoints contain sensitive encrypted identifiers or
 PUUIDs needed for official API calls, provenance, and deduplication. Legacy Stage 1/2
-normalized records retain PUUID as an internal cross-match key; Stage 3.1 canonical
-tables replace it with `player_key`. Console summaries and reports contain aggregate
+normalized artifacts may retain PUUID internally; current normalized records and
+Stage 3.1 canonical tables replace it with `player_key`. Console summaries and
+reports contain aggregate
 counts only and never emit Riot IDs, names, PUUIDs, summoner IDs, or sampled-player
 identifiers.
 

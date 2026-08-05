@@ -40,6 +40,28 @@ def test_duplicate_snapshot_processing_is_idempotent(tmp_path: Path) -> None:
         catalog.close()
 
 
+def test_validation_only_normalizes_without_writing(tmp_path: Path) -> None:
+    snapshot = write_snapshot(
+        tmp_path / "raw",
+        "20260101T000000000000Z",
+        [make_match_payload(match_id="TEST_VALIDATE_ONLY")],
+    )
+    processed = tmp_path / "processed"
+    with ProcessingCatalog(Path(":memory:")) as catalog:
+        summary = SnapshotProcessor(
+            processed_root=processed,
+            catalog=catalog,
+            validate_only=True,
+        ).process([snapshot])
+
+        assert summary.newly_processed_matches == 1
+        assert summary.participant_rows_written == 10
+        assert summary.team_rows_written == 2
+        assert catalog.stats()["total_entries"] == 0
+
+    assert not processed.exists()
+
+
 def test_overlapping_snapshots_do_not_duplicate_matches(tmp_path: Path) -> None:
     raw = tmp_path / "raw"
     first_snapshot = write_snapshot(

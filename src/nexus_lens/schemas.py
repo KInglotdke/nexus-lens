@@ -219,7 +219,7 @@ class NormalizedParticipant(BaseModel):
     item_4: int | None
     item_5: int | None
     item_6: int | None
-    puuid: str | None
+    player_key: str | None
 
 
 class NormalizedTeam(BaseModel):

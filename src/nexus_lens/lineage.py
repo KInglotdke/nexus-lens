@@ -53,14 +53,6 @@ APPROVED_MATCH_STATUSES = {
     "already_cataloged_accepted",
     "already_cataloged_target",
 }
-REPRODUCTION_COMMAND = (
-    ".\\.venv\\Scripts\\python.exe scripts\\repair_collection_lineage.py "
-    "--stage3-3b-run data/processed/stage3/schema=stage3.3b-v1/"
-    "run=20260722T125547567196Z-population "
-    "--checkpoint data/snapshots/population/"
-    "20260722T125547567196Z-population/checkpoint.json "
-    "--manifest data/raw/20260722T125547567196Z-population/manifest.json"
-)
 
 
 class LineageModel(BaseModel):
@@ -163,11 +155,13 @@ def run_lineage_repair(
     manifest_path: Path,
     output_root: Path,
     validate_only: bool,
+    expected_match_count: int = 100,
 ) -> LineageDataset:
     inputs = _load_inputs(
         stage3_3b_directory=stage3_3b_directory,
         checkpoint_path=checkpoint_path,
         manifest_path=manifest_path,
+        expected_match_count=expected_match_count,
     )
     output_directory = (
         output_root / f"schema={LINEAGE_SCHEMA_VERSION}" / f"run={inputs['run_id']}"
@@ -216,6 +210,7 @@ def _load_inputs(
     stage3_3b_directory: Path,
     checkpoint_path: Path,
     manifest_path: Path,
+    expected_match_count: int,
 ) -> dict[str, Any]:
     stage3b_hashes = _hash_required(stage3_3b_directory, REQUIRED_STAGE3B_FILES)
     stage3b_metadata = _load_object(
@@ -289,7 +284,10 @@ def _load_inputs(
         CanonicalMatch,
         "stage3_1_matches",
     )
-    if len(participants) != 1_000 or len(matches) != 100:
+    if (
+        len(participants) != expected_match_count * 10
+        or len(matches) != expected_match_count
+    ):
         raise Stage3ValidationError(
             "retained_row_count", "retained Stage 3.1 row counts disagree"
         )
@@ -752,7 +750,9 @@ def _audit_report(
             "scope": "match and collection",
             "preserved_through": "Stage 3.1 CanonicalMatch.platform and later stages",
             "loss_point": None,
-            "retained_recovery": "observed eun1 for all retained matches",
+            "retained_recovery": (
+                f"observed {platform} for all retained matches"
+            ),
         },
         {
             "field": "regional_routing",
@@ -771,7 +771,8 @@ def _audit_report(
             ),
             "loss_point": "Stage 3.1 validated but did not emit it",
             "retained_recovery": (
-                "derived/collection-context eune for all retained matches"
+                f"derived/collection-context {analysis_region} "
+                "for all retained matches"
             ),
         },
         {
@@ -977,8 +978,17 @@ def _metadata(
             "raw_puuid_written": False,
             "aggregate_report_contains_player_keys": False,
         },
-        "reproduction_command": REPRODUCTION_COMMAND,
+        "reproduction_command": _reproduction_command(inputs),
     }
+
+
+def _reproduction_command(inputs: dict[str, Any]) -> str:
+    return (
+        ".\\.venv\\Scripts\\python.exe scripts\\repair_collection_lineage.py "
+        f"--stage3-3b-run {inputs['stage3b_directory'].as_posix()} "
+        f"--checkpoint {inputs['checkpoint_path'].as_posix()} "
+        f"--manifest {inputs['manifest_path'].as_posix()}"
+    )
 
 
 def _output_hashes(

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import nexus_lens.population_state as population_state
 from nexus_lens.catalog import ProcessingCatalog
 from nexus_lens.population import (
     CheckpointCompatibilityError,
@@ -20,6 +21,52 @@ from nexus_lens.population_state import PopulationState, atomic_write_json
 from nexus_lens.riot_client import RequestMetrics, RiotRetryExhausted
 from nexus_lens.schemas import LeagueEntry, RiotMatch, SummonerRecord
 from tests.factories import make_match_payload
+
+
+def test_checkpoint_atomic_replace_retries_transient_permission_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    destination = tmp_path / "checkpoint.json"
+    real_replace = population_state.os.replace
+    calls = 0
+    sleeps: list[float] = []
+
+    def transient_replace(source: Path, target: Path) -> None:
+        nonlocal calls
+        calls += 1
+        if calls < 3:
+            raise PermissionError("transient sharing violation")
+        real_replace(source, target)
+
+    monkeypatch.setattr(population_state.os, "replace", transient_replace)
+    monkeypatch.setattr(population_state.time, "sleep", sleeps.append)
+
+    atomic_write_json(destination, {"version": 4})
+
+    assert json.loads(destination.read_text(encoding="utf-8")) == {"version": 4}
+    assert calls == 3
+    assert sleeps == [0.05, 0.1]
+
+
+def test_checkpoint_atomic_replace_raises_after_bounded_retries(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    destination = tmp_path / "checkpoint.json"
+    calls = 0
+
+    def denied_replace(source: Path, target: Path) -> None:
+        nonlocal calls
+        calls += 1
+        raise PermissionError("persistent sharing violation")
+
+    monkeypatch.setattr(population_state.os, "replace", denied_replace)
+    monkeypatch.setattr(population_state.time, "sleep", lambda _: None)
+
+    with pytest.raises(PermissionError, match="persistent sharing violation"):
+        atomic_write_json(destination, {"version": 4})
+
+    assert calls == population_state._ATOMIC_REPLACE_ATTEMPTS
+    assert list(tmp_path.iterdir()) == []
 
 
 class StubPopulationClient:

@@ -232,7 +232,13 @@ def build_retained_analytical_dataset(
 ) -> AnalyticalDataset:
     """Load a compatible Stage 3.1 run and build Stage 3.2 rows without writing."""
 
-    expected_patches = dict(expected_patch_counts or EXPECTED_PATCH_COUNTS)
+    expected_patches = dict(
+        expected_patch_counts
+        if expected_patch_counts is not None
+        else stage3_1_patch_counts(
+            input_directory, expected_match_count=expected_match_count
+        )
+    )
     source = load_stage3_1_input(
         input_directory,
         expected_match_count=expected_match_count,
@@ -261,6 +267,31 @@ def build_retained_analytical_dataset(
         expected_team_count=expected_team_count,
         expected_patch_counts=expected_patches,
     )
+
+
+def stage3_1_patch_counts(
+    input_directory: Path, *, expected_match_count: int
+) -> dict[str, int]:
+    """Read validated-shape patch expectations from Stage 3.1 metadata."""
+
+    metadata = _load_json_object(input_directory / "metadata.json", "metadata")
+    value = metadata.get("match_counts_by_public_patch")
+    if (
+        not isinstance(value, dict)
+        or not value
+        or any(
+            not isinstance(patch, str)
+            or not isinstance(count, int)
+            or isinstance(count, bool)
+            or count < 0
+            for patch, count in value.items()
+        )
+        or sum(value.values()) != expected_match_count
+    ):
+        raise Stage3ValidationError(
+            "stage3_1_patch_counts", "Stage 3.1 patch counts are invalid"
+        )
+    return dict(sorted(value.items()))
 
 
 def load_stage3_1_input(

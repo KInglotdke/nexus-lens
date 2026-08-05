@@ -6,6 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from nexus_lens.analytics import EXPECTED_MATCH_COUNT
 from nexus_lens.canonical import Stage3ValidationError
 from nexus_lens.draft_aggregation import (
     PROVISIONAL_MINIMUM_PRACTICAL_ADVANTAGE,
@@ -42,6 +43,12 @@ def _parser() -> argparse.ArgumentParser:
         help="Target public patch; defaults to newest numeric patch in the input",
     )
     parser.add_argument(
+        "--expected-match-count",
+        type=int,
+        default=EXPECTED_MATCH_COUNT,
+        help="Required input match count (default: 100).",
+    )
+    parser.add_argument(
         "--minimum-practical-advantage",
         type=float,
         default=PROVISIONAL_MINIMUM_PRACTICAL_ADVANTAGE,
@@ -69,6 +76,9 @@ def main() -> int:
             validate_only=args.validate_only,
             target_patch=args.target_patch,
             minimum_practical_advantage=args.minimum_practical_advantage,
+            expected_match_count=args.expected_match_count,
+            expected_participant_count=args.expected_match_count * 10,
+            expected_team_count=args.expected_match_count * 2,
         )
     except (Stage3ValidationError, ValueError):
         print(

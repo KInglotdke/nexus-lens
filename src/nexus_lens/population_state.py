@@ -3,8 +3,12 @@
 import json
 import os
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
+
+_ATOMIC_REPLACE_ATTEMPTS = 5
+_ATOMIC_REPLACE_INITIAL_DELAY_SECONDS = 0.05
 
 
 class PopulationState:
@@ -77,6 +81,21 @@ def _atomic_write(path: Path, content: str) -> None:
             handle.write(content)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temporary_path, path)
+        _replace_with_transient_retry(temporary_path, path)
     finally:
         temporary_path.unlink(missing_ok=True)
+
+
+def _replace_with_transient_retry(source: Path, destination: Path) -> None:
+    """Retry only transient Windows-style access failures during atomic replace."""
+
+    delay = _ATOMIC_REPLACE_INITIAL_DELAY_SECONDS
+    for attempt in range(_ATOMIC_REPLACE_ATTEMPTS):
+        try:
+            os.replace(source, destination)
+            return
+        except PermissionError:
+            if attempt == _ATOMIC_REPLACE_ATTEMPTS - 1:
+                raise
+            time.sleep(delay)
+            delay *= 2

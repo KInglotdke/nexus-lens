@@ -1,0 +1,21 @@
+{
+  "platforms": ["euw1"],
+  "target_public_patch": "26.15",
+  "patch_window_size": 2,
+  "tiers": ["GOLD", "PLATINUM", "EMERALD", "DIAMOND"],
+  "divisions": ["I", "II", "III", "IV"],
+  "target_matches_per_platform": 100,
+  "max_players_per_platform": 250,
+  "initial_history_batch_size": 5,
+  "max_history_per_player": 20,
+  "older_patch_stop_threshold": 2,
+  "pages_per_stratum": 1,
+  "max_start_page": 5,
+  "max_match_ids_per_platform": 2500,
+  "max_requests_per_platform": 2000,
+  "concurrency": 1,
+  "seed": 42,
+  "raw_root": "data/canary/26.15/euw/raw",
+  "processed_root": "data/canary/26.15/euw/processed",
+  "snapshot_root": "data/canary/26.15/euw/snapshots/population"
+}

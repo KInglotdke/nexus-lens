@@ -93,6 +93,8 @@ def test_participant_derivations_and_team_normalization() -> None:
     assert participant.cs == 110
     assert participant.primary_style_id == 8000
     assert participant.secondary_style_id == 8300
+    assert participant.player_key is not None
+    assert "puuid" not in participant.model_dump(mode="json")
     assert team.champion_kills == 5
     assert team.dragon_kills == 3
     assert len(team.bans) == 5

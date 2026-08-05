@@ -69,6 +69,12 @@ def parse_args() -> argparse.Namespace:
         help="Separate canonical output root (default: data/processed/stage3).",
     )
     parser.add_argument(
+        "--expected-match-count",
+        type=int,
+        default=EXPECTED_MATCH_COUNT,
+        help="Required accepted-match count (default: 100).",
+    )
+    parser.add_argument(
         "--validate-only",
         "--dry-run",
         action="store_true",
@@ -84,6 +90,7 @@ def main() -> int:
         checkpoint_path = args.checkpoint or _checkpoint_for_manifest(
             manifest_path, args.snapshot_dir
         )
+        expected_patch_counts = _accepted_patch_counts(manifest_path)
         dataset = build_retained_population_dataset(
             manifest_path=manifest_path,
             checkpoint_path=checkpoint_path,
@@ -91,8 +98,8 @@ def main() -> int:
             raw_root=args.raw_dir,
             processed_root=args.processed_dir,
             output_root=args.output_dir,
-            expected_match_count=EXPECTED_MATCH_COUNT,
-            expected_patch_counts=EXPECTED_PATCH_COUNTS,
+            expected_match_count=args.expected_match_count,
+            expected_patch_counts=expected_patch_counts,
         )
         if not dataset.quality_report["ready_for_stage_3_2"]:
             categories = dataset.quality_report["invariant_failures"]
@@ -144,6 +151,31 @@ def _checkpoint_for_manifest(manifest_path: Path, snapshot_root: Path) -> Path:
     if not isinstance(run_id, str) or not run_id:
         raise Stage3ValidationError("malformed_manifest", "run ID is unavailable")
     return snapshot_root / run_id / "checkpoint.json"
+
+
+def _accepted_patch_counts(manifest_path: Path) -> dict[str, int]:
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        value = manifest["summary"]["accepted_matches_by_public_patch"]
+    except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError):
+        raise Stage3ValidationError(
+            "malformed_manifest", "accepted patch counts are unavailable"
+        ) from None
+    if (
+        not isinstance(value, dict)
+        or not value
+        or any(
+            not isinstance(patch, str)
+            or not isinstance(count, int)
+            or isinstance(count, bool)
+            or count < 0
+            for patch, count in value.items()
+        )
+    ):
+        raise Stage3ValidationError(
+            "malformed_manifest", "accepted patch counts are invalid"
+        )
+    return dict(sorted(value.items()))
 
 
 def _print_summary(dataset: CanonicalDataset, *, validate_only: bool) -> None:

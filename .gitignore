@@ -32,3 +32,5 @@ data/processed/*
 !data/processed/.gitkeep
 data/snapshots/*
 !data/snapshots/.gitkeep
+data/canary/
+data/pilot/

@@ -387,8 +387,8 @@ include only processed catalog IDs and deduplicate legacy compatibility files.
 Raw Match-V5 data and discovery checkpoints are ignored and may contain encrypted
 identifiers required for API calls. Run manifests, console output, JSON reports, and
 Markdown reports contain configuration and aggregate counts only. Legacy normalized
-records omit display identities but retain PUUID as an explicitly sensitive internal
-key. Stage 3.1 canonical participant rows replace it with a stable project-scoped
+records may retain PUUID as an explicitly sensitive internal key. Current normalized
+and Stage 3.1 canonical participant rows replace it with a stable project-scoped
 hashed `player_key`; no reversal mapping is written.
 
 ## Sampling bias and deferred work
