@@ -149,6 +149,19 @@ Stage 3.1 deliberately does not calculate KDA, CS/min, gold/min, damage share, k
 participation, matchup statistics, rank baselines, recommendations, or scores. Those
 analysis choices are deferred to Stage 3.2 or later.
 
+### External bounded collections
+
+Large population runs may place raw, processed, checkpoint, catalog, and lineage
+roots on repository-independent storage through a strict local JSON configuration.
+The collector supports private cross-location deduplication, exact-patch transition
+sealing, crash-safe cumulative request accounting, and exclusive checkpoint locks.
+Completed-population validation remains the Stage 3.1 default. A quiescent run that
+ended only at its explicit request ceiling may use `--allow-bounded-partial` together
+with its exact accepted count; every queue, patch, payload, catalog, row, and lineage
+invariant still applies. Partial publications use an accepted-count snapshot root so
+later resumes do not collide with immutable Stage 3 outputs. See
+[external collection operations](docs/external_collection.md).
+
 ## Stage 3.2: deterministic analytical features
 
 Stage 3.2 reads only a completed, compatible Stage 3.1 run. It validates all six

@@ -459,6 +459,16 @@ written atomically and never modified afterward. Normalized records use atomic
 per-file replacement; the catalog is marked processed only afterward. Report readers
 include only processed catalog IDs and deduplicate legacy compatibility files.
 
+External collection roots use the same raw, processed, catalog, checkpoint, and
+lineage boundaries as repository-local runs. A private match-ID-only SQLite index
+prevents compatible retained matches from being downloaded again without copying old
+payloads. Request metrics are merged into every atomic checkpoint save, abrupt runs
+receive a conservative recovery charge, and a separate SQLite exclusive transaction
+prevents concurrent processes from resuming one checkpoint. A newer resolved public
+patch can seal an exact-patch run before another history or payload request. Partial
+Stage 3 publication is explicit and limited to a quiescent request-budget stop; the
+default completed-population gate and downstream formula contracts are unchanged.
+
 ## Privacy
 
 Raw Match-V5 data and discovery checkpoints are ignored and may contain encrypted

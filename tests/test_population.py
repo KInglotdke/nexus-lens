@@ -17,7 +17,12 @@ from nexus_lens.population import (
     discover_league_entries,
     validate_checkpoint_extension,
 )
-from nexus_lens.population_state import PopulationState, atomic_write_json
+from nexus_lens.population_state import (
+    PopulationRunLockedError,
+    PopulationState,
+    atomic_write_json,
+    exclusive_population_run,
+)
 from nexus_lens.riot_client import RequestMetrics, RiotRetryExhausted
 from nexus_lens.schemas import LeagueEntry, RiotMatch, SummonerRecord
 from tests.factories import make_match_payload
@@ -67,6 +72,20 @@ def test_checkpoint_atomic_replace_raises_after_bounded_retries(
 
     assert calls == population_state._ATOMIC_REPLACE_ATTEMPTS
     assert list(tmp_path.iterdir()) == []
+
+
+def test_population_run_lock_prevents_overlapping_collectors(
+    tmp_path: Path,
+) -> None:
+    lock_path = tmp_path / "run" / "collector.lock.sqlite3"
+
+    with exclusive_population_run(lock_path), pytest.raises(
+        PopulationRunLockedError
+    ), exclusive_population_run(lock_path):
+        pass
+
+    with exclusive_population_run(lock_path):
+        pass
 
 
 class StubPopulationClient:
@@ -172,6 +191,27 @@ def make_collector(
     )
 
 
+def test_active_collector_checkpoints_current_request_metrics(
+    tmp_path: Path,
+) -> None:
+    config = make_config()
+    client = StubPopulationClient()
+    state = make_state(tmp_path, config)
+    with ProcessingCatalog(tmp_path / "processed" / "catalog.sqlite3") as catalog:
+        make_collector(tmp_path, config, client, catalog, state)
+        client.metrics.attempted_requests = 7
+        client.metrics.successful_requests = 6
+        state.save()
+
+    saved = PopulationState.load(state.path).payload
+    assert saved["request_metrics"]["attempted_requests"] == 7
+    assert saved["request_metrics"]["successful_requests"] == 6
+    assert saved["active_request_invocation"] == {
+        "schema_version": "population-request-invocation-v1",
+        "baseline_attempted_requests": 0,
+    }
+
+
 @pytest.mark.asyncio
 async def test_league_discovery_paginates_until_empty() -> None:
     client = StubPopulationClient()
@@ -258,6 +298,76 @@ async def test_overlapping_histories_download_match_once(tmp_path: Path) -> None
     rendered = json.dumps(summary.as_dict())
     assert "player-a" not in rendered
     assert "player-b" not in rendered
+
+
+@pytest.mark.asyncio
+async def test_external_deduplication_prevents_download_and_preserves_source(
+    tmp_path: Path,
+) -> None:
+    config = make_config(target_matches=1)
+    client = StubPopulationClient()
+    client.entries[("GOLD", "I", 1)] = [LeagueEntry(puuid="player-a")]
+    client.histories["player-a"] = ["EXISTING", "TARGET"]
+    client.matches["TARGET"] = RiotMatch.model_validate(
+        make_match_payload(match_id="TARGET", game_version="16.14.1.1")
+    )
+    state = make_state(tmp_path, config)
+    with ProcessingCatalog(tmp_path / "processed" / "catalog.sqlite3") as catalog:
+        collector = PopulationCollector(
+            config=config,
+            client=client,  # type: ignore[arg-type]
+            catalog=catalog,
+            state=state,
+            raw_snapshot_dir=tmp_path / "raw" / "SYNTHETIC_RUN",
+            processed_root=tmp_path / "processed",
+            external_deduplication_match_ids={"EXISTING"},
+        )
+        summary = await collector.collect()
+
+    assert summary.target_reached is True
+    assert summary.cross_location_duplicate_match_ids == 1
+    assert client.match_calls["EXISTING"] == 0
+    assert client.match_calls["TARGET"] == 1
+    assert state.matches["EXISTING"]["status"] == "external_duplicate"
+    assert len(state.matches["EXISTING"]["sources"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_newer_patch_transition_is_rejected_and_seals_checkpoint(
+    tmp_path: Path,
+) -> None:
+    config = make_config(target_matches=2, stop_on_newer_patch=True)
+    client = StubPopulationClient()
+    client.entries[("GOLD", "I", 1)] = [LeagueEntry(puuid="player-a")]
+    client.histories["player-a"] = ["NEWER", "NEVER"]
+    client.matches["NEWER"] = RiotMatch.model_validate(
+        make_match_payload(match_id="NEWER", game_version="16.15.1.1")
+    )
+    client.matches["NEVER"] = RiotMatch.model_validate(
+        make_match_payload(match_id="NEVER", game_version="16.14.1.1")
+    )
+    state = make_state(tmp_path, config)
+    with ProcessingCatalog(tmp_path / "processed" / "catalog.sqlite3") as catalog:
+        summary = await make_collector(
+            tmp_path, config, client, catalog, state
+        ).collect()
+
+    assert summary.target_reached is False
+    assert summary.completion_status == "newer_patch_transition_detected"
+    assert summary.newer_patch_transition_matches == 1
+    assert summary.accepted_matches == 0
+    assert client.match_calls["NEWER"] == 1
+    assert client.match_calls["NEVER"] == 0
+    assert state.payload["patch_transition"]["public_patch"] == "26.15"
+    assert not list((tmp_path / "processed").glob("**/NEWER*"))
+
+    resumed_client = StubPopulationClient()
+    with ProcessingCatalog(tmp_path / "processed" / "catalog.sqlite3") as catalog:
+        resumed = await make_collector(
+            tmp_path, config, resumed_client, catalog, state
+        ).collect()
+    assert resumed.completion_status == "newer_patch_transition_detected"
+    assert resumed_client.match_calls == Counter()
 
 
 @pytest.mark.asyncio

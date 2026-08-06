@@ -2,13 +2,43 @@
 
 import json
 import os
+import sqlite3
 import tempfile
 import time
+from collections.abc import Callable
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 _ATOMIC_REPLACE_ATTEMPTS = 5
 _ATOMIC_REPLACE_INITIAL_DELAY_SECONDS = 0.05
+
+
+class PopulationRunLockedError(RuntimeError):
+    """Raised when another process owns a population checkpoint run."""
+
+
+@contextmanager
+def exclusive_population_run(path: Path):
+    """Hold a process-crash-safe exclusive lock for one checkpoint run."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(path, timeout=0, isolation_level=None)
+    try:
+        connection.execute("PRAGMA busy_timeout = 0")
+        try:
+            connection.execute(
+                "CREATE TABLE IF NOT EXISTS run_lock "
+                "(singleton INTEGER PRIMARY KEY)"
+            )
+            connection.execute("BEGIN EXCLUSIVE")
+        except sqlite3.OperationalError:
+            raise PopulationRunLockedError(
+                "population checkpoint is already in use"
+            ) from None
+        yield
+    finally:
+        connection.close()
 
 
 class PopulationState:
@@ -17,6 +47,7 @@ class PopulationState:
     def __init__(self, path: Path, payload: dict[str, Any]) -> None:
         self.path = path
         self.payload = payload
+        self.before_save: Callable[[], None] | None = None
 
     @classmethod
     def create(
@@ -54,6 +85,8 @@ class PopulationState:
         return self.payload["matches"]
 
     def save(self) -> None:
+        if self.before_save is not None:
+            self.before_save()
         _atomic_write(
             self.path,
             json.dumps(self.payload, indent=2, sort_keys=True) + "\n",

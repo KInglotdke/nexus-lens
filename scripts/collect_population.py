@@ -22,7 +22,15 @@ from nexus_lens.population import (
     new_run_id,
     validate_checkpoint_extension,
 )
-from nexus_lens.population_state import PopulationState
+from nexus_lens.population_state import (
+    PopulationRunLockedError,
+    PopulationState,
+    exclusive_population_run,
+)
+from nexus_lens.private_dedup import (
+    load_private_deduplication_index,
+    match_set_sha256,
+)
 from nexus_lens.riot_client import (
     RiotApiError,
     RiotClient,
@@ -83,6 +91,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-match-ids", type=int, default=1_000)
     parser.add_argument("--max-requests", type=int, default=1_000)
     parser.add_argument(
+        "--stop-on-newer-patch",
+        action="store_true",
+        help="Seal the checkpoint after the first resolved patch newer than target",
+    )
+    parser.add_argument(
+        "--deduplication-index",
+        action="append",
+        type=Path,
+        default=[],
+        dest="deduplication_indexes",
+        help="Private cross-location match-ID index; repeat as needed",
+    )
+    parser.add_argument(
         "--allow-over-default",
         action="store_true",
         help="Required when target matches exceeds the default safety limit of 100.",
@@ -122,6 +143,7 @@ def make_config(args: argparse.Namespace) -> PopulationConfig:
         args.raw_dir = expanded.raw_root
         args.processed_dir = expanded.processed_root
         args.state_dir = expanded.snapshot_root
+        args.deduplication_indexes = list(expanded.deduplication_indexes)
         return expanded.population_config(expanded.platforms[0])
     if args.target_public_patch is None:
         raise ValueError("--target-public-patch is required without --config")
@@ -161,12 +183,24 @@ def make_config(args: argparse.Namespace) -> PopulationConfig:
         max_start_page=args.max_start_page,
         max_match_ids=max_match_ids,
         max_requests=max_requests,
+        stop_on_newer_patch=args.stop_on_newer_patch,
     )
 
 
 async def run_collection(args: argparse.Namespace, config: PopulationConfig) -> None:
     run_id = args.resume or new_run_id()
     checkpoint = args.state_dir / run_id / "checkpoint.json"
+    lock_path = checkpoint.parent / "collector.lock.sqlite3"
+    with exclusive_population_run(lock_path):
+        await _run_collection_locked(args, config, run_id, checkpoint)
+
+
+async def _run_collection_locked(
+    args: argparse.Namespace,
+    config: PopulationConfig,
+    run_id: str,
+    checkpoint: Path,
+) -> None:
     if args.resume:
         if not checkpoint.is_file():
             raise CheckpointCompatibilityError(
@@ -184,6 +218,29 @@ async def run_collection(args: argparse.Namespace, config: PopulationConfig) -> 
             run_id=run_id,
             config=config.non_sensitive_dict(),
         )
+
+    external_deduplication_match_ids: set[str] = set()
+    for index_path in args.deduplication_indexes:
+        external_deduplication_match_ids.update(
+            load_private_deduplication_index(
+                index_path,
+                platform=config.platform,
+                analysis_region=config.analysis_region,
+                public_patch=config.target_public_patch,
+            )
+        )
+    deduplication_metadata = {
+        "schema_version": "private-match-dedup-reference-v1",
+        "match_count": len(external_deduplication_match_ids),
+        "match_set_sha256": match_set_sha256(external_deduplication_match_ids),
+    }
+    saved_deduplication = state.payload.get("external_deduplication")
+    if saved_deduplication not in (None, deduplication_metadata):
+        raise CheckpointCompatibilityError(
+            "checkpoint incompatible: external deduplication index differs"
+        )
+    state.payload["external_deduplication"] = deduplication_metadata
+    state.save()
 
     recover_missing_request_budget(state, config)
 
@@ -209,6 +266,9 @@ async def run_collection(args: argparse.Namespace, config: PopulationConfig) -> 
                 state=state,
                 raw_snapshot_dir=raw_snapshot,
                 processed_root=args.processed_dir,
+                external_deduplication_match_ids=(
+                    external_deduplication_match_ids
+                ),
             ).collect()
     print_summary(summary.as_dict())
 
@@ -233,6 +293,7 @@ def print_summary(summary: dict[str, object]) -> None:
         "players_examined",
         "match_ids_discovered",
         "duplicate_match_ids",
+        "cross_location_duplicate_match_ids",
         "already_cataloged_matches",
         "already_downloaded_matches",
         "payloads_downloaded",
@@ -250,6 +311,7 @@ def print_summary(summary: dict[str, object]) -> None:
         "accepted_matches_reused_from_checkpoint_state_this_run",
         "wrong_patch_matches",
         "outside_patch_window_matches",
+        "newer_patch_transition_matches",
         "total_wrong_patch_matches_observed",
         "newly_downloaded_wrong_patch_matches",
         "unresolved_patch_matches",
@@ -270,6 +332,7 @@ def print_summary(summary: dict[str, object]) -> None:
         "elapsed_seconds",
         "target_reached",
         "completion_status",
+        "patch_transition",
     ):
         print(f"  {key}: {summary[key]}")
 
@@ -279,6 +342,8 @@ def sanitized_collection_error(error: Exception) -> str:
 
     if isinstance(error, CheckpointCompatibilityError):
         return str(error)
+    if isinstance(error, PopulationRunLockedError):
+        return "population checkpoint is already in use by another process"
     if isinstance(error, RiotRequestBudgetExceeded):
         return "request budget exhausted"
     if isinstance(error, RiotApiError):
@@ -300,30 +365,55 @@ def recover_missing_request_budget(
     """Charge a conservative attempt upper bound for interrupted old checkpoints."""
 
     metrics = state.payload.setdefault("request_metrics", {})
-    if "attempted_requests" in metrics:
-        return int(metrics["attempted_requests"])
-    if not state.players and not state.matches:
+    attempted = int(metrics.get("attempted_requests", 0))
+    endpoint_attempts = metrics.get("requests_by_endpoint", {})
+    recorded_payload_attempts = int(endpoint_attempts.get("match_payload", 0))
+    downloaded_payloads = sum(
+        1 for record in state.matches.values() if record.get("raw_path")
+    )
+    previous_recovery = state.payload.get("request_budget_recovery", {})
+    if not isinstance(previous_recovery, dict):
+        previous_recovery = {}
+    covered_payload_gap = int(
+        previous_recovery.get("covered_payload_metric_gap", 0)
+    )
+    current_payload_gap = max(0, downloaded_payloads - recorded_payload_attempts)
+    active_invocation = state.payload.pop("active_request_invocation", None)
+    structural_gap = current_payload_gap > covered_payload_gap
+    if not active_invocation and not structural_gap and "attempted_requests" in metrics:
+        return attempted
+    if not state.players and not state.matches and not active_invocation:
         return 0
-    sampling = state.payload.get("sampling", {})
-    candidates = sampling.get("candidates", {})
-    candidate_offsets = sampling.get("candidate_offsets", {})
-    league_calls = len(candidates) * config.pages_per_stratum
-    summoner_calls = sum(int(value) for value in candidate_offsets.values())
-    history_calls = len(state.players) * math.ceil(
-        config.max_history_per_player / config.initial_history_batch_size
-    )
-    payload_calls = len(state.matches)
-    maximum_attempts_per_call = 4
-    charged_attempts = maximum_attempts_per_call * (
-        league_calls + summoner_calls + history_calls + payload_calls
-    )
-    metrics["attempted_requests"] = charged_attempts
+    if active_invocation and not structural_gap:
+        charged_attempts = attempted + 4 * max(
+            config.pages_per_stratum, config.concurrency
+        )
+    else:
+        sampling = state.payload.get("sampling", {})
+        candidates = sampling.get("candidates", {})
+        candidate_offsets = sampling.get("candidate_offsets", {})
+        league_calls = len(candidates) * config.pages_per_stratum
+        summoner_calls = sum(int(value) for value in candidate_offsets.values())
+        history_calls = len(state.players) * math.ceil(
+            config.max_history_per_player / config.initial_history_batch_size
+        )
+        payload_calls = len(state.matches)
+        maximum_attempts_per_call = 4
+        charged_attempts = maximum_attempts_per_call * (
+            league_calls + summoner_calls + history_calls + payload_calls
+        )
+    metrics["attempted_requests"] = max(attempted, charged_attempts)
     state.payload["request_budget_recovery"] = {
         "method": "conservative_upper_bound",
-        "charged_attempts": charged_attempts,
+        "charged_attempts": metrics["attempted_requests"],
+        "active_invocation_recovered": bool(active_invocation),
+        "structural_payload_gap_recovered": structural_gap,
+        "covered_payload_metric_gap": max(
+            covered_payload_gap, current_payload_gap
+        ),
     }
     state.save()
-    return charged_attempts
+    return int(metrics["attempted_requests"])
 
 
 def main() -> int:

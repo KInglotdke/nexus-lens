@@ -112,6 +112,33 @@ def test_config_loader_is_strict_and_contains_no_secret(tmp_path: Path) -> None:
         load_expanded_collection_config(path)
 
 
+def test_external_roots_deduplication_and_transition_guard_are_planned(
+    tmp_path: Path,
+) -> None:
+    index = tmp_path / "private" / "dedup.sqlite3"
+    config = make_config(
+        platforms=("eun1",),
+        patch_window_size=1,
+        stop_on_newer_patch=True,
+        deduplication_indexes=(index,),
+        raw_root=tmp_path / "raw",
+        processed_root=tmp_path / "processed",
+        snapshot_root=tmp_path / "snapshots",
+    )
+
+    plan = build_expanded_collection_plan(config, environment={})
+    platform = plan["platform_plans"][0]
+
+    assert platform["accepted_public_patches_newest_first"] == ["26.14"]
+    assert platform["patch_transition_guard"] == {
+        "stop_on_newer_patch": True,
+        "accepted_patch_is_exact": True,
+    }
+    assert platform["deduplication"]["private_cross_location_indexes"] == [
+        index.as_posix()
+    ]
+
+
 def test_unsupported_platform_and_non_queue_scope_cannot_be_planned() -> None:
     with pytest.raises(ValueError, match="only eun1 and euw1"):
         make_config(platforms=("na1",))

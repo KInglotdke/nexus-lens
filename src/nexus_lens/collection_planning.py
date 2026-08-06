@@ -42,6 +42,8 @@ class ExpandedCollectionPlanConfig:
     max_requests_per_platform: int = 20_000
     concurrency: int = 1
     seed: int = 42
+    stop_on_newer_patch: bool = False
+    deduplication_indexes: tuple[Path, ...] = ()
     raw_root: Path = Path("data/raw")
     processed_root: Path = Path("data/processed")
     snapshot_root: Path = Path("data/snapshots/population")
@@ -78,6 +80,7 @@ class ExpandedCollectionPlanConfig:
             max_start_page=self.max_start_page,
             max_match_ids=self.max_match_ids_per_platform,
             max_requests=self.max_requests_per_platform,
+            stop_on_newer_patch=self.stop_on_newer_patch,
         )
 
 
@@ -156,6 +159,8 @@ def load_expanded_collection_config(
         "max_requests_per_platform",
         "concurrency",
         "seed",
+        "stop_on_newer_patch",
+        "deduplication_indexes",
         "raw_root",
         "processed_root",
         "snapshot_root",
@@ -171,6 +176,10 @@ def load_expanded_collection_config(
     for field in ("raw_root", "processed_root", "snapshot_root"):
         if field in payload:
             payload[field] = Path(payload[field])
+    if "deduplication_indexes" in payload:
+        payload["deduplication_indexes"] = tuple(
+            Path(value) for value in payload["deduplication_indexes"]
+        )
     try:
         return ExpandedCollectionPlanConfig(**payload)
     except (TypeError, ValueError):
@@ -241,6 +250,13 @@ def _platform_plan(
             "multiple_discovery_contexts": (
                 "preserve all without duplicate analytics rows"
             ),
+            "private_cross_location_indexes": [
+                path.as_posix() for path in expanded.deduplication_indexes
+            ],
+        },
+        "patch_transition_guard": {
+            "stop_on_newer_patch": population.stop_on_newer_patch,
+            "accepted_patch_is_exact": population.patch_window_size == 1,
         },
         "resumable_checkpoint": (
             expanded.snapshot_root / run_placeholder / "checkpoint.json"

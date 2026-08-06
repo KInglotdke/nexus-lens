@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from nexus_lens.population import CheckpointCompatibilityError, PopulationConfig
-from nexus_lens.population_state import PopulationState
+from nexus_lens.population_state import PopulationRunLockedError, PopulationState
 from nexus_lens.riot_client import (
     RiotApiError,
     RiotRequestBudgetExceeded,
@@ -39,6 +39,10 @@ from scripts.collect_population import (
         (
             RiotRetryExhausted("sensitive internal detail"),
             "Riot request retries exhausted",
+        ),
+        (
+            PopulationRunLockedError("internal lock detail"),
+            "population checkpoint is already in use by another process",
         ),
     ],
 )
@@ -87,7 +91,85 @@ def test_interrupted_checkpoint_gets_conservative_request_charge(
     assert state.payload["request_budget_recovery"] == {
         "method": "conservative_upper_bound",
         "charged_attempts": 60,
+        "active_invocation_recovered": False,
+        "structural_payload_gap_recovered": False,
+        "covered_payload_metric_gap": 0,
     }
+
+
+def test_active_invocation_gets_bounded_crash_recovery_charge(
+    tmp_path: Path,
+) -> None:
+    config = PopulationConfig(
+        platform="eun1",
+        target_public_patch="26.15",
+        pages_per_stratum=5,
+    )
+    state = PopulationState.create(
+        tmp_path / "checkpoint.json",
+        run_id="SYNTHETIC",
+        config=config.non_sensitive_dict(),
+    )
+    state.payload["request_metrics"] = {
+        "attempted_requests": 100,
+        "requests_by_endpoint": {"match_payload": 1},
+    }
+    state.payload["active_request_invocation"] = {
+        "schema_version": "population-request-invocation-v1",
+        "baseline_attempted_requests": 25,
+    }
+    state.matches["A"] = {"raw_path": "downloads/A.json"}
+
+    charged = recover_missing_request_budget(state, config)
+
+    assert charged == 120
+    assert "active_request_invocation" not in state.payload
+    assert state.payload["request_budget_recovery"] == {
+        "method": "conservative_upper_bound",
+        "charged_attempts": 120,
+        "active_invocation_recovered": True,
+        "structural_payload_gap_recovered": False,
+        "covered_payload_metric_gap": 0,
+    }
+
+
+def test_legacy_interruption_repairs_structurally_stale_metrics(
+    tmp_path: Path,
+) -> None:
+    config = PopulationConfig(
+        platform="eun1",
+        target_public_patch="26.15",
+        initial_history_batch_size=5,
+        max_history_per_player=20,
+    )
+    state = PopulationState.create(
+        tmp_path / "checkpoint.json",
+        run_id="SYNTHETIC",
+        config=config.non_sensitive_dict(),
+    )
+    state.payload["request_metrics"] = {
+        "attempted_requests": 5,
+        "requests_by_endpoint": {"match_payload": 1},
+    }
+    state.players["one"] = {}
+    state.matches.update(
+        {
+            "A": {"raw_path": "downloads/A.json"},
+            "B": {"raw_path": "downloads/B.json"},
+        }
+    )
+
+    charged = recover_missing_request_budget(state, config)
+
+    assert charged == 24
+    assert state.payload["request_budget_recovery"] == {
+        "method": "conservative_upper_bound",
+        "charged_attempts": 24,
+        "active_invocation_recovered": False,
+        "structural_payload_gap_recovered": True,
+        "covered_payload_metric_gap": 1,
+    }
+    assert recover_missing_request_budget(state, config) == 24
 
 
 def test_single_platform_plan_config_drives_live_collector_roots(

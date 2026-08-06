@@ -177,6 +177,7 @@ def build_retained_population_dataset(
     output_root: Path,
     expected_match_count: int = EXPECTED_MATCH_COUNT,
     expected_patch_counts: dict[str, int] | None = None,
+    allow_bounded_partial: bool = False,
 ) -> CanonicalDataset:
     """Validate all retained inputs and build canonical rows without writing."""
 
@@ -188,6 +189,7 @@ def build_retained_population_dataset(
         checkpoint,
         expected_match_count=expected_match_count,
         expected_patch_counts=expected_patches,
+        allow_bounded_partial=allow_bounded_partial,
     )
     approved_payloads = _resolve_approved_payloads(
         approvals=approvals,
@@ -198,8 +200,20 @@ def build_retained_population_dataset(
         processed_root=processed_root,
     )
     relative_manifest = _relative_reference(manifest_path, Path.cwd())
+    bounded_snapshot = (
+        allow_bounded_partial
+        and manifest.get("summary", {}).get("completion_status")
+        == "request_budget_exhausted"
+    )
+    publication_root = (
+        output_root / f"snapshot=accepted-{expected_match_count}"
+        if bounded_snapshot
+        else output_root
+    )
     output_directory = (
-        output_root / f"schema={CANONICAL_SCHEMA_VERSION}" / f"run={run_id}"
+        publication_root
+        / f"schema={CANONICAL_SCHEMA_VERSION}"
+        / f"run={run_id}"
     )
     return build_canonical_dataset(
         run_id=run_id,
@@ -356,6 +370,7 @@ def _validate_approval_state(
     *,
     expected_match_count: int,
     expected_patch_counts: dict[str, int],
+    allow_bounded_partial: bool = False,
 ) -> tuple[str, str, dict[str, str]]:
     run_id = _required_string(manifest.get("run_id"), "manifest_run_id")
     if checkpoint.get("run_id") != run_id:
@@ -372,10 +387,32 @@ def _validate_approval_state(
         )
     if not isinstance(matches, dict):
         raise Stage3ValidationError("malformed_checkpoint", "match state is missing")
-    if (
-        summary.get("target_reached") is not True
-        or summary.get("completion_status") != "target_reached"
-    ):
+    completed = (
+        summary.get("target_reached") is True
+        and summary.get("completion_status") == "target_reached"
+    )
+    request_metrics = summary.get("request_metrics")
+    request_ceiling = config.get("max_requests")
+    attempted_requests = (
+        request_metrics.get("attempted_requests")
+        if isinstance(request_metrics, dict)
+        else None
+    )
+    bounded_partial = (
+        allow_bounded_partial
+        and summary.get("target_reached") is False
+        and summary.get("completion_status") == "request_budget_exhausted"
+        and isinstance(request_metrics, dict)
+        and isinstance(request_ceiling, int)
+        and not isinstance(request_ceiling, bool)
+        and isinstance(attempted_requests, int)
+        and not isinstance(attempted_requests, bool)
+        and request_ceiling == checkpoint_config.get("max_requests")
+        and attempted_requests >= request_ceiling
+        and checkpoint.get("active_request_invocation") is None
+        and checkpoint.get("patch_transition") is None
+    )
+    if not completed and not bounded_partial:
         raise Stage3ValidationError(
             "incomplete_population", "Stage 2 population did not reach its target"
         )

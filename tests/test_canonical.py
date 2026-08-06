@@ -429,3 +429,40 @@ def _build_from_retained(inputs: dict[str, object]):
         expected_match_count=sum(inputs["patch_counts"].values()),
         expected_patch_counts=inputs["patch_counts"],
     )
+
+
+def test_bounded_partial_requires_explicit_opt_in(tmp_path: Path) -> None:
+    inputs = _write_retained_inputs(
+        tmp_path,
+        [make_match_payload(match_id="PARTIAL", game_version="16.14.1.1")],
+    )
+    manifest_path = inputs["manifest"]
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["summary"]["target_reached"] = False
+    manifest["summary"]["completion_status"] = "request_budget_exhausted"
+    manifest["summary"]["request_metrics"] = {"attempted_requests": 50}
+    manifest["configuration"]["max_requests"] = 50
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    checkpoint_path = inputs["checkpoint"]
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    checkpoint["config"]["max_requests"] = 50
+    checkpoint_path.write_text(json.dumps(checkpoint), encoding="utf-8")
+
+    with pytest.raises(Stage3ValidationError) as error:
+        _build_from_retained(inputs)
+    assert error.value.category == "incomplete_population"
+
+    dataset = build_retained_population_dataset(
+        manifest_path=inputs["manifest"],
+        checkpoint_path=inputs["checkpoint"],
+        catalog_path=inputs["catalog"],
+        raw_root=inputs["raw"],
+        processed_root=inputs["processed"],
+        output_root=inputs["processed"] / "stage3",
+        expected_match_count=1,
+        expected_patch_counts=inputs["patch_counts"],
+        allow_bounded_partial=True,
+    )
+
+    assert dataset.quality_report["ready_for_stage_3_2"] is True
+    assert dataset.output_directory.parent.parent.name == "snapshot=accepted-1"

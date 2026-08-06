@@ -93,6 +93,7 @@ class PopulationConfig:
     max_start_page: int = 5
     max_match_ids: int = 1_000
     max_requests: int = 1_000
+    stop_on_newer_patch: bool = False
     histories_per_player: int | None = None
 
     def __post_init__(self) -> None:
@@ -184,6 +185,7 @@ class PopulationConfig:
             "max_start_page": self.max_start_page,
             "max_match_ids": self.max_match_ids,
             "max_requests": self.max_requests,
+            "stop_on_newer_patch": self.stop_on_newer_patch,
         }
 
     @classmethod
@@ -218,6 +220,7 @@ class PopulationConfig:
             max_start_page=int(saved.get("max_start_page", 5)),
             max_match_ids=int(saved.get("max_match_ids", 1_000)),
             max_requests=int(saved.get("max_requests", 1_000)),
+            stop_on_newer_patch=bool(saved.get("stop_on_newer_patch", False)),
         )
 
 
@@ -248,6 +251,7 @@ def validate_checkpoint_extension(
         "concurrency",
         "pages_per_stratum",
         "max_start_page",
+        "stop_on_newer_patch",
     )
     for field in immutable_fields:
         if getattr(saved_config, field) != getattr(requested, field):
@@ -320,6 +324,7 @@ class PopulationCollector:
         state: PopulationState,
         raw_snapshot_dir: Path,
         processed_root: Path,
+        external_deduplication_match_ids: set[str] | None = None,
     ) -> None:
         self.config = config
         self.client = client
@@ -327,7 +332,14 @@ class PopulationCollector:
         self.state = state
         self.raw_snapshot_dir = raw_snapshot_dir
         self.processed_root = processed_root
+        self.external_deduplication_match_ids = (
+            external_deduplication_match_ids or set()
+        )
         self._stop_reason = "bounds_exhausted"
+        if self.config.stop_on_newer_patch and self.state.payload.get(
+            "patch_transition"
+        ):
+            self._stop_reason = "newer_patch_transition_detected"
         self._initial_target_match_ids = {
             match_id
             for match_id, record in self.state.matches.items()
@@ -340,6 +352,16 @@ class PopulationCollector:
         self._known_terminal_match_ids: set[str] = set()
         self._known_wrong_patch_match_ids: set[str] = set()
         self._initial_downloaded = self._downloaded_count()
+        self._request_metrics_at_start = dict(
+            self.state.payload.get("request_metrics", {})
+        )
+        self.state.payload["active_request_invocation"] = {
+            "schema_version": "population-request-invocation-v1",
+            "baseline_attempted_requests": int(
+                self._request_metrics_at_start.get("attempted_requests", 0)
+            ),
+        }
+        self.state.before_save = self._checkpoint_request_metrics
         self._ensure_state_shape()
 
     async def collect(self) -> PopulationSummary:
@@ -356,10 +378,7 @@ class PopulationCollector:
             else:
                 await self._collect_fast()
         finally:
-            self.state.payload["request_metrics"] = _merge_request_metrics(
-                self.state.payload.get("request_metrics", {}),
-                self.client.metrics.as_dict(),
-            )
+            self.state.payload.pop("active_request_invocation", None)
             self._update_checkpoint_metadata()
             self.state.save()
 
@@ -379,6 +398,13 @@ class PopulationCollector:
         self.state.save()
         self._write_manifest(summary)
         return summary
+
+    def _checkpoint_request_metrics(self) -> None:
+        self.state.payload["request_metrics"] = _merge_request_metrics(
+            self._request_metrics_at_start,
+            self.client.metrics.as_dict(),
+        )
+        self._update_checkpoint_metadata()
 
     def _ensure_state_shape(self) -> None:
         self.state.payload["version"] = max(
@@ -426,6 +452,8 @@ class PopulationCollector:
             "wrong_patch_cached",
             "outside_patch_window",
             "outside_patch_window_cached",
+            "newer_patch_transition",
+            "newer_patch_transition_cached",
         }
         for match_id, record in self.state.matches.items():
             if record.get("status") not in migratable:
@@ -765,7 +793,10 @@ class PopulationCollector:
 
         observation = self.catalog.match_observation(match_id)
         record: dict[str, Any] = {"status": "pending", "sources": [source]}
-        if observation and observation["status"] == "processed":
+        if match_id in self.external_deduplication_match_ids:
+            record["status"] = "external_duplicate"
+            self._known_terminal_match_ids.add(match_id)
+        elif observation and observation["status"] == "processed":
             record.update(
                 status=(
                     "already_cataloged_accepted"
@@ -790,6 +821,10 @@ class PopulationCollector:
                 cached_status = "pending"
             elif failure in ("wrong_patch", "outside_patch_window"):
                 cached_status = "outside_patch_window_cached"
+            elif failure == "newer_patch_transition":
+                cached_status = "newer_patch_transition_cached"
+                if self.config.stop_on_newer_patch:
+                    self._record_patch_transition(public_patch)
             else:
                 cached_status = "cached_rejected"
             record.update(
@@ -812,6 +847,8 @@ class PopulationCollector:
             "wrong_patch_cached",
             "outside_patch_window",
             "outside_patch_window_cached",
+            "newer_patch_transition",
+            "newer_patch_transition_cached",
         ):
             self._known_wrong_patch_match_ids.add(match_id)
 
@@ -908,10 +945,19 @@ class PopulationCollector:
             self._record_rejected_batch(match_id, batch, "unresolved_patch")
             return
         if batch.match.public_patch not in self.config.accepted_public_patches:
-            record["status"] = "outside_patch_window"
-            self._record_rejected_batch(
-                match_id, batch, "outside_patch_window"
-            )
+            if self.config.stop_on_newer_patch and _is_newer_patch(
+                batch.match.public_patch, self.config.target_public_patch
+            ):
+                record["status"] = "newer_patch_transition"
+                self._record_rejected_batch(
+                    match_id, batch, "newer_patch_transition"
+                )
+                self._record_patch_transition(batch.match.public_patch)
+            else:
+                record["status"] = "outside_patch_window"
+                self._record_rejected_batch(
+                    match_id, batch, "outside_patch_window"
+                )
             return
 
         write_normalized_batch(
@@ -937,13 +983,32 @@ class PopulationCollector:
             source_snapshot=self.raw_snapshot_dir.name,
             queue_id=batch.match.queue_id,
             failure_code=code,
-            failure_reason="payload is outside the accepted public patch window",
+            failure_reason=(
+                "newer public patch transition detected"
+                if code == "newer_patch_transition"
+                else "payload is outside the accepted public patch window"
+            ),
             api_game_version=batch.match.api_game_version,
             api_patch=batch.match.api_patch,
             public_patch=batch.match.public_patch,
             patch_resolution_method=batch.match.patch_resolution_method,
             patch_resolution_status=batch.match.patch_resolution_status,
         )
+
+    def _record_patch_transition(self, public_patch: str | None) -> None:
+        transition = self.state.payload.setdefault(
+            "patch_transition",
+            {
+                "detected": True,
+                "public_patch": public_patch,
+                "rejected_match_count": 0,
+                "detected_at": datetime.now(UTC).isoformat(),
+            },
+        )
+        transition["rejected_match_count"] = int(
+            transition.get("rejected_match_count", 0)
+        ) + 1
+        self._stop_reason = "newer_patch_transition_detected"
 
     async def _resolve_puuid(self, entry: LeagueEntry) -> str | None:
         if entry.puuid:
@@ -981,7 +1046,8 @@ class PopulationCollector:
             or len(self.state.players) >= self.config.max_players
             or len(self.state.matches) >= self.config.max_match_ids
             or self.client.metrics.attempted_requests >= self.config.max_requests
-            or self._stop_reason == "request_budget_exhausted"
+            or self._stop_reason
+            in ("request_budget_exhausted", "newer_patch_transition_detected")
         )
 
     def _download_should_stop(self) -> bool:
@@ -989,7 +1055,8 @@ class PopulationCollector:
             self._target_reached()
             or len(self.state.matches) >= self.config.max_match_ids
             or self.client.metrics.attempted_requests >= self.config.max_requests
-            or self._stop_reason == "request_budget_exhausted"
+            or self._stop_reason
+            in ("request_budget_exhausted", "newer_patch_transition_detected")
         )
 
     def _accepted_count(self) -> int:
@@ -1019,6 +1086,8 @@ class PopulationCollector:
                 "wrong_patch_cached",
                 "outside_patch_window",
                 "outside_patch_window_cached",
+                "newer_patch_transition",
+                "newer_patch_transition_cached",
             )
             for record in self.state.matches.values()
         )
@@ -1063,7 +1132,14 @@ class PopulationCollector:
             count
             for status, count in statuses.items()
             if str(status).startswith("rejected_")
-            or status in ("unresolved_patch", "request_failed", "cached_rejected")
+            or status
+            in (
+                "unresolved_patch",
+                "request_failed",
+                "cached_rejected",
+                "newer_patch_transition",
+                "newer_patch_transition_cached",
+            )
         )
         malformed = sum(
             statuses[status]
@@ -1097,6 +1173,8 @@ class PopulationCollector:
             for match_id in self._downloaded_match_ids
             if self.state.matches[match_id].get("status")
             in ("wrong_patch", "outside_patch_window")
+            or self.state.matches[match_id].get("status")
+            == "newer_patch_transition"
         }
         examined_terminal_ids = (
             self._downloaded_match_ids | self._known_terminal_match_ids
@@ -1163,6 +1241,9 @@ class PopulationCollector:
             "players_examined": len(self.state.players),
             "match_ids_discovered": len(self.state.matches),
             "duplicate_match_ids": int(self.state.payload["overlap_events"]),
+            "cross_location_duplicate_match_ids": statuses[
+                "external_duplicate"
+            ],
             "already_cataloged_matches": statuses["already_cataloged_target"]
             + statuses["already_cataloged_accepted"]
             + statuses["already_cataloged_other"],
@@ -1191,6 +1272,10 @@ class PopulationCollector:
             "wrong_patch_matches": self._wrong_patch_count(),
             "total_wrong_patch_matches_observed": self._wrong_patch_count(),
             "outside_patch_window_matches": self._wrong_patch_count(),
+            "newer_patch_transition_matches": statuses[
+                "newer_patch_transition"
+            ]
+            + statuses["newer_patch_transition_cached"],
             "newly_downloaded_wrong_patch_matches": len(
                 downloaded_wrong_patch_ids
             ),
@@ -1204,6 +1289,7 @@ class PopulationCollector:
             "elapsed_seconds": round(elapsed, 6),
             "target_reached": target_reached,
             "completion_status": self._stop_reason,
+            "patch_transition": self.state.payload.get("patch_transition"),
             "efficiency_metric_definitions": EFFICIENCY_METRIC_DEFINITIONS,
         }
         values.update(efficiency)
@@ -1374,6 +1460,15 @@ def _merge_request_metrics(
 def _is_older_patch(candidate: str, target: str) -> bool:
     try:
         return tuple(map(int, candidate.split("."))) < tuple(
+            map(int, target.split("."))
+        )
+    except ValueError:
+        return False
+
+
+def _is_newer_patch(candidate: str, target: str) -> bool:
+    try:
+        return tuple(map(int, candidate.split("."))) > tuple(
             map(int, target.split("."))
         )
     except ValueError:

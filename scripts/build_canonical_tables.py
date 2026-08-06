@@ -80,6 +80,14 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Perform every input and row validation without writing output files.",
     )
+    parser.add_argument(
+        "--allow-bounded-partial",
+        action="store_true",
+        help=(
+            "Explicitly allow a request-budget-exhausted checkpoint to publish "
+            "exactly --expected-match-count accepted matches."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -100,6 +108,7 @@ def main() -> int:
             output_root=args.output_dir,
             expected_match_count=args.expected_match_count,
             expected_patch_counts=expected_patch_counts,
+            allow_bounded_partial=args.allow_bounded_partial,
         )
         if not dataset.quality_report["ready_for_stage_3_2"]:
             categories = dataset.quality_report["invariant_failures"]
