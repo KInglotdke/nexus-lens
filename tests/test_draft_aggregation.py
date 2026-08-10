@@ -83,6 +83,43 @@ def test_directional_synergy_and_pair_deduplication(tmp_path: Path) -> None:
     assert sum(row.source_observation_count for row in dataset.synergy_aggregates) == 40
 
 
+def test_validation_indexes_role_contributions_in_one_pass(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = aggregation._validate_aggregates
+    observed_iterations: list[int] = []
+
+    class OnePassRoleContributions(list[object]):
+        iterations = 0
+
+        def __iter__(self):  # type: ignore[no-untyped-def]
+            self.iterations += 1
+            if self.iterations > 1:
+                raise AssertionError("role contributions were rescanned")
+            return super().__iter__()
+
+    def validate_with_tracked_roles(**kwargs):  # type: ignore[no-untyped-def]
+        tracked = OnePassRoleContributions(kwargs["role_contributions"])
+        kwargs["role_contributions"] = tracked
+        result = original(**kwargs)
+        observed_iterations.append(tracked.iterations)
+        return result
+
+    monkeypatch.setattr(
+        aggregation, "_validate_aggregates", validate_with_tracked_roles
+    )
+    stage33a = _stage33a(
+        tmp_path,
+        [_match("MATCH-1", "26.14", (1, 2, 3, 4, 5), (11, 12, 13, 14, 15))],
+    )
+
+    dataset = _build(tmp_path, stage33a)
+
+    assert dataset.quality_report["invariant_failures"] == {}
+    assert dataset.quality_report["reconciliation_failures"] == {}
+    assert observed_iterations == [1]
+
+
 def test_duplicate_directional_synergy_per_team_match_is_rejected(
     tmp_path: Path,
 ) -> None:

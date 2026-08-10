@@ -1459,6 +1459,12 @@ def _validate_aggregates(
     if dict(expected_synergy) != actual_synergy:
         reconciliation["synergy_contribution_totals"] += 1
 
+    role_group_lookup: dict[tuple[Any, ...], list[_RoleContribution]] = (
+        defaultdict(list)
+    )
+    for contribution in role_contributions:
+        role_group_lookup[_role_group_key(contribution)].append(contribution)
+
     matchup_aggregate_lookup = {
         _aggregate_pair_key(row): row for row in matchup_aggregates
     }
@@ -1548,20 +1554,33 @@ def _validate_aggregates(
             invariants["production_posterior_evaluated"] += 1
 
     for aggregate in matchup_aggregates:
+        context_values = _aggregate_context_values(aggregate)
         expected_focal = [
             row
-            for row in role_contributions
-            if _role_matches_aggregate_focal(row, aggregate)
-            and row.matchup_eligible
+            for row in role_group_lookup.get(
+                (
+                    aggregate.focal_champion_id,
+                    aggregate.focal_position,
+                    *context_values,
+                ),
+                [],
+            )
+            if row.matchup_eligible
             and row.opponent is not None
             and row.opponent
             != (aggregate.opponent_champion_id, aggregate.opponent_position)
         ]
         expected_opponent = [
             row
-            for row in role_contributions
-            if _role_matches_aggregate_opponent(row, aggregate)
-            and row.matchup_eligible
+            for row in role_group_lookup.get(
+                (
+                    aggregate.opponent_champion_id,
+                    aggregate.opponent_position,
+                    *context_values,
+                ),
+                [],
+            )
+            if row.matchup_eligible
             and row.opponent is not None
             and row.opponent != (aggregate.focal_champion_id, aggregate.focal_position)
         ]
@@ -1575,18 +1594,31 @@ def _validate_aggregates(
             reconciliation["opponent_matchup_exclusion"] += 1
 
     for aggregate in synergy_aggregates:
+        context_values = _aggregate_context_values(aggregate)
         expected_focal = [
             row
-            for row in role_contributions
-            if _role_matches_synergy_focal(row, aggregate)
-            and row.synergy_eligible
+            for row in role_group_lookup.get(
+                (
+                    aggregate.focal_champion_id,
+                    aggregate.focal_position,
+                    *context_values,
+                ),
+                [],
+            )
+            if row.synergy_eligible
             and (aggregate.ally_champion_id, aggregate.ally_position) not in row.allies
         ]
         expected_ally = [
             row
-            for row in role_contributions
-            if _role_matches_synergy_ally(row, aggregate)
-            and row.synergy_eligible
+            for row in role_group_lookup.get(
+                (
+                    aggregate.ally_champion_id,
+                    aggregate.ally_position,
+                    *context_values,
+                ),
+                [],
+            )
+            if row.synergy_eligible
             and (aggregate.focal_champion_id, aggregate.focal_position)
             not in row.allies
         ]
@@ -1604,10 +1636,15 @@ def _validate_aggregates(
     )
     if len(matchup_contributions) != scoped_eligible_matchup:
         reconciliation["stage3_3a_matchup_eligibility"] += 1
+    matchup_participant_keys = {
+        (row.match_id, row.team_id, row.focal_champion_id)
+        for row in matchup_contributions
+    }
     if any(
         not row.matchup_eligibility
         for row in stage33a.participants
-        if _participant_in_matchup_contributions(row, matchup_contributions)
+        if (row.match_id, row.team_id, row.champion_id)
+        in matchup_participant_keys
     ):
         invariants["ineligible_matchup_contribution"] += 1
     if eligible_matchup < scoped_eligible_matchup:
@@ -1622,6 +1659,20 @@ def _validate_aggregates(
     if nonfinite:
         invariants["nonfinite_values"] += nonfinite
     return {"reconciliation": reconciliation, "invariants": invariants}
+
+
+def _aggregate_context_values(
+    aggregate: MatchupAggregate | SynergyAggregate,
+) -> tuple[Any, ...]:
+    return (
+        aggregate.platform,
+        aggregate.region,
+        aggregate.region_lineage_status,
+        aggregate.rank_bracket,
+        aggregate.collection_stratum,
+        aggregate.rank_lineage_status,
+        aggregate.queue_id,
+    )
 
 
 def _validate_statistics_bundle(
@@ -2189,94 +2240,6 @@ def _contribution_sort_key(row: _PairContribution) -> tuple[Any, ...]:
 
 def _role_contribution_sort_key(row: _RoleContribution) -> tuple[Any, ...]:
     return (*_role_group_key(row), row.match_id, row.team_id)
-
-
-def _role_matches_aggregate_focal(
-    row: _RoleContribution, aggregate: MatchupAggregate
-) -> bool:
-    return (
-        row.champion_id == aggregate.focal_champion_id
-        and row.position == aggregate.focal_position
-        and row.context.values()
-        == (
-            aggregate.platform,
-            aggregate.region,
-            aggregate.region_lineage_status,
-            aggregate.rank_bracket,
-            aggregate.collection_stratum,
-            aggregate.rank_lineage_status,
-            aggregate.queue_id,
-        )
-    )
-
-
-def _role_matches_aggregate_opponent(
-    row: _RoleContribution, aggregate: MatchupAggregate
-) -> bool:
-    return (
-        row.champion_id == aggregate.opponent_champion_id
-        and row.position == aggregate.opponent_position
-        and row.context.values()
-        == (
-            aggregate.platform,
-            aggregate.region,
-            aggregate.region_lineage_status,
-            aggregate.rank_bracket,
-            aggregate.collection_stratum,
-            aggregate.rank_lineage_status,
-            aggregate.queue_id,
-        )
-    )
-
-
-def _role_matches_synergy_focal(
-    row: _RoleContribution, aggregate: SynergyAggregate
-) -> bool:
-    return (
-        row.champion_id == aggregate.focal_champion_id
-        and row.position == aggregate.focal_position
-        and row.context.values()
-        == (
-            aggregate.platform,
-            aggregate.region,
-            aggregate.region_lineage_status,
-            aggregate.rank_bracket,
-            aggregate.collection_stratum,
-            aggregate.rank_lineage_status,
-            aggregate.queue_id,
-        )
-    )
-
-
-def _role_matches_synergy_ally(
-    row: _RoleContribution, aggregate: SynergyAggregate
-) -> bool:
-    return (
-        row.champion_id == aggregate.ally_champion_id
-        and row.position == aggregate.ally_position
-        and row.context.values()
-        == (
-            aggregate.platform,
-            aggregate.region,
-            aggregate.region_lineage_status,
-            aggregate.rank_bracket,
-            aggregate.collection_stratum,
-            aggregate.rank_lineage_status,
-            aggregate.queue_id,
-        )
-    )
-
-
-def _participant_in_matchup_contributions(
-    participant: ParticipantDraftObservation,
-    contributions: list[_PairContribution],
-) -> bool:
-    return any(
-        row.match_id == participant.match_id
-        and row.team_id == participant.team_id
-        and row.focal_champion_id == participant.champion_id
-        for row in contributions
-    )
 
 
 def _champion_names(
