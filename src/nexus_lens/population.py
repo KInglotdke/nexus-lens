@@ -399,6 +399,19 @@ class PopulationCollector:
         self._write_manifest(summary)
         return summary
 
+    def finalize_interrupted(self) -> PopulationSummary:
+        """Seal an atomically saved interrupted checkpoint without API requests."""
+
+        self.state.payload.pop("active_request_invocation", None)
+        self._update_checkpoint_metadata()
+        self._stop_reason = "execution_window_interrupted"
+        target_reached = self._target_reached()
+        coverage_met = self._coverage_met()
+        summary = self._summary(0.0, target_reached, coverage_met)
+        self.state.save()
+        self._write_manifest(summary)
+        return summary
+
     def _checkpoint_request_metrics(self) -> None:
         self.state.payload["request_metrics"] = _merge_request_metrics(
             self._request_metrics_at_start,

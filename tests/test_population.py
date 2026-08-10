@@ -81,6 +81,48 @@ def test_checkpoint_atomic_replace_raises_after_bounded_retries(
     assert list(tmp_path.iterdir()) == []
 
 
+def test_finalize_interrupted_writes_quiescent_manifest_without_requests(
+    tmp_path: Path,
+) -> None:
+    config = make_config(target_matches=2)
+    state = make_state(tmp_path, config)
+    state.payload["active_request_invocation"] = {
+        "schema_version": "population-request-invocation-v1",
+        "baseline_attempted_requests": 3,
+    }
+    payload = make_match_payload(match_id="SYNTHETIC_ACCEPTED")
+    raw_dir = tmp_path / "raw" / "SYNTHETIC_RUN"
+    raw_dir.mkdir(parents=True)
+    raw_path = raw_dir / "accepted.json"
+    raw_path.write_text(json.dumps(payload), encoding="utf-8")
+    state.matches["SYNTHETIC_ACCEPTED"] = {
+        "status": "accepted",
+        "raw_path": "accepted.json",
+        "public_patch": config.target_public_patch,
+        "sources": [{"tier": "GOLD", "division": "I"}],
+    }
+    client = StubPopulationClient()
+    with ProcessingCatalog(tmp_path / "processed" / "catalog.sqlite3") as catalog:
+        summary = PopulationCollector(
+            config=config,
+            client=client,  # type: ignore[arg-type]
+            catalog=catalog,
+            state=state,
+            raw_snapshot_dir=raw_dir,
+            processed_root=tmp_path / "processed",
+        ).finalize_interrupted()
+
+    manifest = json.loads((raw_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert "active_request_invocation" not in state.payload
+    assert manifest["summary"]["accepted_matches"] == 1
+    assert manifest["summary"]["completion_status"] == (
+        "execution_window_interrupted"
+    )
+    assert manifest["match_files"] == ["accepted.json"]
+    assert summary.accepted_matches_credited_this_run == 0
+    assert client.metrics.attempted_requests == 0
+
+
 def test_population_run_lock_prevents_overlapping_collectors(
     tmp_path: Path,
 ) -> None:

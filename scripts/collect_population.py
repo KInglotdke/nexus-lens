@@ -32,6 +32,7 @@ from nexus_lens.private_dedup import (
     match_set_sha256,
 )
 from nexus_lens.riot_client import (
+    RequestMetrics,
     RiotApiError,
     RiotClient,
     RiotRequestBudgetExceeded,
@@ -122,6 +123,14 @@ def parse_args() -> argparse.Namespace:
         "--dry-run",
         action="store_true",
         help="Print a non-sensitive zero-request plan without loading .env.",
+    )
+    parser.add_argument(
+        "--finalize-interrupted",
+        action="store_true",
+        help=(
+            "Recover an interrupted request budget and publish its quiescent "
+            "checkpoint manifest without loading .env or making API requests."
+        ),
     )
     parser.add_argument("--raw-dir", type=Path, default=Path("data/raw"))
     parser.add_argument(
@@ -244,12 +253,32 @@ async def _run_collection_locked(
 
     recover_missing_request_budget(state, config)
 
+    raw_snapshot = args.raw_dir / run_id
+    catalog_path = args.processed_dir / "catalog.sqlite3"
+    if args.finalize_interrupted:
+        if not args.resume:
+            raise CheckpointCompatibilityError(
+                "--finalize-interrupted requires --resume"
+            )
+        with ProcessingCatalog(catalog_path) as catalog:
+            summary = PopulationCollector(
+                config=config,
+                client=_OfflineFinalizationClient(),  # type: ignore[arg-type]
+                catalog=catalog,
+                state=state,
+                raw_snapshot_dir=raw_snapshot,
+                processed_root=args.processed_dir,
+                external_deduplication_match_ids=(
+                    external_deduplication_match_ids
+                ),
+            ).finalize_interrupted()
+        print_summary(summary.as_dict())
+        return
+
     settings = Settings(  # type: ignore[call-arg]
         platform_region=config.platform,
         routing_region=config.regional_routing,
     )
-    raw_snapshot = args.raw_dir / run_id
-    catalog_path = args.processed_dir / "catalog.sqlite3"
     previous_attempts = int(
         state.payload.get("request_metrics", {}).get("attempted_requests", 0)
     )
@@ -271,6 +300,13 @@ async def _run_collection_locked(
                 ),
             ).collect()
     print_summary(summary.as_dict())
+
+
+class _OfflineFinalizationClient:
+    """Metrics-only client used by the zero-network finalization path."""
+
+    def __init__(self) -> None:
+        self.metrics = RequestMetrics()
 
 
 def print_summary(summary: dict[str, object]) -> None:
