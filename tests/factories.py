@@ -12,6 +12,7 @@ def make_match_payload(
     participant_count: int = 10,
     team_count: int = 2,
     game_version: str = "16.12.788.4269",
+    platform_id: str | None = "TEST1",
 ) -> dict[str, Any]:
     positions = ("TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY")
     participants = []
@@ -84,7 +85,7 @@ def make_match_payload(
             "gameMode": "CLASSIC",
             "gameType": "MATCHED_GAME",
             "mapId": 11,
-            "platformId": "TEST1",
+            "platformId": platform_id,
             "participants": participants,
             "teams": teams,
         },

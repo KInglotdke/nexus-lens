@@ -25,7 +25,14 @@ from nexus_lens.population_state import (
 )
 from nexus_lens.riot_client import RequestMetrics, RiotRetryExhausted
 from nexus_lens.schemas import LeagueEntry, RiotMatch, SummonerRecord
-from tests.factories import make_match_payload
+from tests.factories import make_match_payload as _make_match_payload
+
+
+def make_match_payload(**kwargs: object) -> dict[str, object]:
+    """Build population fixtures for the configured EUN1 platform."""
+
+    kwargs.setdefault("platform_id", "EUN1")
+    return _make_match_payload(**kwargs)  # type: ignore[arg-type,return-value]
 
 
 def test_checkpoint_atomic_replace_retries_transient_permission_error(
@@ -298,6 +305,44 @@ async def test_overlapping_histories_download_match_once(tmp_path: Path) -> None
     rendered = json.dumps(summary.as_dict())
     assert "player-a" not in rendered
     assert "player-b" not in rendered
+
+
+@pytest.mark.asyncio
+async def test_collector_rejects_accepted_patch_from_other_platform(
+    tmp_path: Path,
+) -> None:
+    config = make_config(target_matches=1)
+    client = StubPopulationClient()
+    client.entries[("GOLD", "I", 1)] = [LeagueEntry(puuid="player-a")]
+    client.histories["player-a"] = ["CROSS_PLATFORM", "TARGET"]
+    client.matches["CROSS_PLATFORM"] = RiotMatch.model_validate(
+        make_match_payload(
+            match_id="CROSS_PLATFORM",
+            game_version="16.14.1.1",
+            platform_id="EUW1",
+        )
+    )
+    client.matches["TARGET"] = RiotMatch.model_validate(
+        make_match_payload(match_id="TARGET", game_version="16.14.1.1")
+    )
+    state = make_state(tmp_path, config)
+    with ProcessingCatalog(tmp_path / "processed" / "catalog.sqlite3") as catalog:
+        summary = await make_collector(
+            tmp_path, config, client, catalog, state
+        ).collect()
+        rejected = catalog.match_observation("CROSS_PLATFORM")
+
+    assert summary.accepted_matches == 1
+    assert summary.rejected_matches == 1
+    assert summary.target_reached is True
+    assert state.matches["CROSS_PLATFORM"]["status"] == (
+        "rejected_platform_mismatch"
+    )
+    assert state.matches["TARGET"]["status"] == "accepted"
+    assert rejected is not None
+    assert rejected["status"] == "rejected"
+    assert rejected["failure_code"] == "platform_mismatch"
+    assert client.match_calls == Counter({"CROSS_PLATFORM": 1, "TARGET": 1})
 
 
 @pytest.mark.asyncio

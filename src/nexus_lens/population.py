@@ -960,6 +960,14 @@ class PopulationCollector:
                 )
             return
 
+        if (
+            not batch.match.platform_id
+            or batch.match.platform_id.lower() != self.config.platform.lower()
+        ):
+            record["status"] = "rejected_platform_mismatch"
+            self._record_rejected_batch(match_id, batch, "platform_mismatch")
+            return
+
         write_normalized_batch(
             self.processed_root, self.config.analysis_region, batch
         )
@@ -977,17 +985,23 @@ class PopulationCollector:
         record["status"] = "accepted"
 
     def _record_rejected_batch(self, match_id: str, batch: Any, code: str) -> None:
+        reasons = {
+            "newer_patch_transition": "newer public patch transition detected",
+            "outside_patch_window": (
+                "payload is outside the accepted public patch window"
+            ),
+            "unresolved_patch": "payload public patch could not be resolved",
+            "platform_mismatch": (
+                "payload platform differs from the configured platform"
+            ),
+        }
         self.catalog.record_rejected(
             match_id=match_id,
             routing_region=self.config.analysis_region,
             source_snapshot=self.raw_snapshot_dir.name,
             queue_id=batch.match.queue_id,
             failure_code=code,
-            failure_reason=(
-                "newer public patch transition detected"
-                if code == "newer_patch_transition"
-                else "payload is outside the accepted public patch window"
-            ),
+            failure_reason=reasons[code],
             api_game_version=batch.match.api_game_version,
             api_patch=batch.match.api_patch,
             public_patch=batch.match.public_patch,
