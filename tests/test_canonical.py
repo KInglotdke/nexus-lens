@@ -466,3 +466,41 @@ def test_bounded_partial_requires_explicit_opt_in(tmp_path: Path) -> None:
 
     assert dataset.quality_report["ready_for_stage_3_2"] is True
     assert dataset.output_directory.parent.parent.name == "snapshot=accepted-1"
+
+
+def test_recovered_execution_window_partial_can_be_processed(
+    tmp_path: Path,
+) -> None:
+    inputs = _write_retained_inputs(
+        tmp_path,
+        [make_match_payload(match_id="INTERRUPTED", game_version="16.14.1.1")],
+    )
+    manifest_path = inputs["manifest"]
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["summary"]["target_reached"] = False
+    manifest["summary"]["completion_status"] = "execution_window_interrupted"
+    manifest["summary"]["request_metrics"] = {"attempted_requests": 35}
+    manifest["configuration"]["max_requests"] = 50
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    checkpoint_path = inputs["checkpoint"]
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    checkpoint["config"]["max_requests"] = 50
+    checkpoint["request_budget_recovery"] = {
+        "active_invocation_recovered": True
+    }
+    checkpoint_path.write_text(json.dumps(checkpoint), encoding="utf-8")
+
+    dataset = build_retained_population_dataset(
+        manifest_path=inputs["manifest"],
+        checkpoint_path=inputs["checkpoint"],
+        catalog_path=inputs["catalog"],
+        raw_root=inputs["raw"],
+        processed_root=inputs["processed"],
+        output_root=inputs["processed"] / "stage3",
+        expected_match_count=1,
+        expected_patch_counts=inputs["patch_counts"],
+        allow_bounded_partial=True,
+    )
+
+    assert dataset.quality_report["ready_for_stage_3_2"] is True
+    assert dataset.output_directory.parent.parent.name == "snapshot=accepted-1"

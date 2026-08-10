@@ -203,7 +203,7 @@ def build_retained_population_dataset(
     bounded_snapshot = (
         allow_bounded_partial
         and manifest.get("summary", {}).get("completion_status")
-        == "request_budget_exhausted"
+        in {"request_budget_exhausted", "execution_window_interrupted"}
     )
     publication_root = (
         output_root / f"snapshot=accepted-{expected_match_count}"
@@ -398,17 +398,30 @@ def _validate_approval_state(
         if isinstance(request_metrics, dict)
         else None
     )
+    completion_status = summary.get("completion_status")
+    recovered_interruption = (
+        completion_status == "execution_window_interrupted"
+        and isinstance(checkpoint.get("request_budget_recovery"), dict)
+        and checkpoint["request_budget_recovery"].get(
+            "active_invocation_recovered"
+        )
+        is True
+    )
     bounded_partial = (
         allow_bounded_partial
         and summary.get("target_reached") is False
-        and summary.get("completion_status") == "request_budget_exhausted"
+        and completion_status
+        in {"request_budget_exhausted", "execution_window_interrupted"}
         and isinstance(request_metrics, dict)
         and isinstance(request_ceiling, int)
         and not isinstance(request_ceiling, bool)
         and isinstance(attempted_requests, int)
         and not isinstance(attempted_requests, bool)
         and request_ceiling == checkpoint_config.get("max_requests")
-        and attempted_requests >= request_ceiling
+        and (
+            attempted_requests >= request_ceiling
+            or recovered_interruption
+        )
         and checkpoint.get("active_request_invocation") is None
         and checkpoint.get("patch_transition") is None
     )
