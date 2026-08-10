@@ -45,6 +45,29 @@ def write_normalized_batch(
     return partition
 
 
+def normalized_match_paths(
+    processed_root: Path,
+    routing_region: str,
+    public_patch: str,
+    queue_id: int,
+    match_id: str,
+) -> tuple[Path, Path, Path]:
+    """Return the deterministic files belonging to one normalized match."""
+
+    partition = (
+        processed_root
+        / f"region={_safe(routing_region)}"
+        / f"patch={_safe(public_patch)}"
+        / f"queue={queue_id}"
+    )
+    filename = _safe(match_id)
+    return (
+        partition / "matches" / f"{filename}.json",
+        partition / "participants" / f"{filename}.jsonl",
+        partition / "teams" / f"{filename}.jsonl",
+    )
+
+
 def iter_json_records(root: Path, record_type: str) -> Iterator[dict[str, Any]]:
     """Yield normalized records in stable path and line order."""
 
