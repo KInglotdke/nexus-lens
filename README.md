@@ -478,6 +478,10 @@ The prospective pre-26.16 contract is locked by platform under
 `config/evaluation/stage3.4a-pre-26.16-v1/`. It makes composition-only versus fixed
 0.5 paired match-level log loss primary, leaves direct matchups exploratory, and
 contains deterministic development-only sample-size evidence. See
+[docs/stage3_4a_pooled_development.md](docs/stage3_4a_pooled_development.md) for the
+later prospective addendum that permits pooled EUNE/EUW patch-26.15 development
+while retaining platform subgroups and preserving patch 26.16 as the untouched
+temporal test. See
 [docs/stage3_4a_freeze.md](docs/stage3_4a_freeze.md). No 26.16 outcome was used to
 create the freeze.
 
