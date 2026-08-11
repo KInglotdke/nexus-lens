@@ -88,3 +88,18 @@ writes bounded privacy-safe JSONL progress outside the scientific result directo
 It records fit number, fold, model, L2 candidate, optimizer completion, bootstrap
 progress, final fitting, artifact construction, and publication timing. It contains
 no match or player identifiers and is not a scientific artifact.
+
+## Published development result
+
+The single instrumented publication from repository commit `c70ab05` is stored under
+`config/evaluation/stage3.4a-patch26.15-pooled-dev-protocol-v1/results/`. Its
+deterministic bundle SHA-256 is
+`985e780325b1514870af1ca3c45ccb666b65121b99785871b208b7f7a7429e9b`; the outer
+and final-selection fold fingerprints are respectively
+`0ba47e9c44e1899a186e460375ed8b5b2613687c5d660339d04bb0e908ef4008` and
+`c0dcb5fb40885addccd4830f59b091fc0523a2c960b49712e97d9308a4a1a8f2`.
+
+The run reconciled 10,000 accepted matches to 9,414 eligible drafts and selected
+L2 `0.1` for both frozen model variants. These are patch-26.15 nested-CV development
+estimates, not final test performance. The result does not authorize a recommendation
+policy, and patch 26.16 remained untouched.

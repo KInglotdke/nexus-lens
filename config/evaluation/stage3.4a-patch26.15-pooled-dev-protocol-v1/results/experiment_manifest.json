@@ -1,0 +1,191 @@
+{
+  "accepted_counts": {
+    "eune": 5000,
+    "euw": 5000,
+    "overall": 10000
+  },
+  "combined_input_sha256": "e753718197ae5caeddce5f34430b1f68638b792f32ca76c53afb22e3ddd6b68d",
+  "configuration": {
+    "bootstrap_replicates": 200,
+    "bootstrap_seed": 34101,
+    "calibration_bins": 10,
+    "final_selection_folds": 5,
+    "inner_folds": 4,
+    "l2_candidates": [
+      0.1,
+      1.0
+    ],
+    "max_iterations": 500,
+    "optimizer_tolerance": 1e-09,
+    "outer_folds": 5,
+    "seed": 34001
+  },
+  "configuration_sha256": "0340735bcbe43ce34bbb3a7ab265c5c8d87dacccece4495b813f9c3d558f2ab1",
+  "deterministic_output_sha256": {
+    "development_metrics.json": "075e127351bfe894660afb8fa8012b59d7caa0319d1883a950d412b7cf14db9f",
+    "development_report.md": "368168fc870fe35d53ab0a6a5d159bd13c5b24a8faa72e1f02e525a1ad1c6587",
+    "final_models.json": "328fff06857a8175015e785e8307dbe1fe5f89770b9b784cf83cd932c8de8814",
+    "quality_report.json": "e1cbed787140e1b0d197097e9fac97c0daafcbb597deb5314ccd662de332c578"
+  },
+  "eligible_counts": {
+    "eune": 4700,
+    "euw": 4714,
+    "overall": 9414
+  },
+  "features": {
+    "composition_only": "signed_allied_plus_one_opposing_minus_one_champion_role_indicators",
+    "composition_plus_lane_matchups": "composition_features_plus_signed_unordered_same_role_champion_pair_indicators",
+    "evaluation_unseen_feature_fallback": "zero_coefficient_contribution",
+    "fold_local_vocabulary": true,
+    "global_stage3_3b_outcome_aggregates_used": false,
+    "intercept": false,
+    "matchup_target_statistics_feature": false,
+    "platform_predictive_feature": false,
+    "scaling": null,
+    "team_id_predictive_feature": false
+  },
+  "final_model_sha256": {
+    "composition_only": "094ded532ed1319ea82744a10e6ca158adadf68d85a24b6c4e0e216faa0b97fe",
+    "composition_plus_lane_matchups": "5b7f73e9b1348ff5179401e070d5bbf988c4f6cb547a09c000b2e59179a17a2d"
+  },
+  "fold_assignment": {
+    "final_selection_sha256": "c0dcb5fb40885addccd4830f59b091fc0523a2c960b49712e97d9308a4a1a8f2",
+    "group": "match",
+    "outer_sha256": "0ba47e9c44e1899a186e460375ed8b5b2613687c5d660339d04bb0e908ef4008",
+    "strata": [
+      "platform",
+      "binary_target"
+    ]
+  },
+  "future_final_evaluation": {
+    "development_model_retraining_or_tuning_allowed": false,
+    "evaluation_patch": "26.16",
+    "outcomes_may_be_inspected_before_model_lock": false,
+    "platform_feature_allowed": false,
+    "platforms_collected_and_sealed_separately": true,
+    "report_overall_and_by_platform": true,
+    "status": "untouched_not_collected",
+    "training_patch": "26.15"
+  },
+  "models": {
+    "primary_development_model": "composition_plus_lane_matchups",
+    "reference_model": "composition_only",
+    "specifications": [
+      "composition_only",
+      "composition_plus_lane_matchups"
+    ]
+  },
+  "privacy": {
+    "aggregate_metrics_only": true,
+    "credentials_loaded": false,
+    "external_paths_published": false,
+    "match_or_player_level_predictions_published": false,
+    "platform_retained_as_metadata": true,
+    "player_identifiers_or_pseudonyms_published": false
+  },
+  "protocol": {
+    "logical_path": "config/evaluation/stage3.4a-patch26.15-pooled-dev-protocol-v1/protocol.json",
+    "peeled_commit": "23ef5b99f6a644daac44b2c849717bcb6c952860",
+    "protocol_id": "stage3.4a-patch26.15-pooled-dev-protocol-v1",
+    "sha256": "ac7b9f221b98a6e9b0c021d071642bb6ecc5706112d46d1432216e7ae0fe8a00",
+    "tag": "stage3.4a-patch26.15-pooled-dev-protocol-v1",
+    "tag_object": "e627a5ebd3529b07866ce49944f4260f55f25798"
+  },
+  "repository_commit_used_for_execution": "c70ab05d6b250568edb8260bdfca2ae6acf2bb15",
+  "schema_version": "stage3.4a-pooled-development-experiment-v1",
+  "sealed_sources": [
+    {
+      "accepted_patch_26_15_matches": 4589,
+      "analysis_region": "eune",
+      "composition_eligible_matches": 4319,
+      "declared_tree_sha256": "3bd0b9dfc047aa5b206d3a93d2d8b759274a1a0fae7c4de9ae79eb014f757e1c",
+      "excluded_matches": 270,
+      "input_match_count": 4589,
+      "lineage_sha256": {
+        "draft_observation_quality_report.json": "c8ebf67599b552154e51239921e2e52aa8398c516a28dbe08dde16c1a23fdd71",
+        "match_draft_context.jsonl": "2799b79774c7c6855fc01091c79793961ac2f3cda9eb19421e6c05905cfe8ab0",
+        "metadata.json": "0df9d1d0c20d3b3757d93b6fec28152e0bdfe1c75ca1a1a918e26287ed6aa592",
+        "participant_draft_observations.jsonl": "da2753715a0c929a55f2f57aff84c8f309ab3544686da1559fda88c8fd3f718c",
+        "team_draft_observations.jsonl": "3e590806336fe509b7da0fdbfd109891caba82583415b50ecee140946313414a"
+      },
+      "platform": "eun1",
+      "source_kind": "external"
+    },
+    {
+      "accepted_patch_26_15_matches": 411,
+      "analysis_region": "eune",
+      "composition_eligible_matches": 381,
+      "declared_tree_sha256": null,
+      "excluded_matches": 30,
+      "input_match_count": 1000,
+      "lineage_sha256": {
+        "draft_observation_quality_report.json": "60691fa027c46cbd90308d44d8f23404c9e43a9acc5188037b66a5f4dcc7f0bc",
+        "match_draft_context.jsonl": "336c6c81f962488addb9481669868750e780a695f4e0eacf8448359975c38e47",
+        "metadata.json": "82328523c286866dcc6131728006e95b513ec182930750f4cd7c3cd9f8d19139",
+        "participant_draft_observations.jsonl": "8565ecee30d5dd47e00400f91685d830310e45144e9efdb05d3a30b576722166",
+        "team_draft_observations.jsonl": "5f72ac2689a31dacbe5a6fcc7d9c0c5044eec0f6c0b7be8e1d8c58a66ced8b59"
+      },
+      "platform": "eun1",
+      "source_kind": "retained_private"
+    },
+    {
+      "accepted_patch_26_15_matches": 4567,
+      "analysis_region": "euw",
+      "composition_eligible_matches": 4309,
+      "declared_tree_sha256": "bdf920dccf6cf52d563c26216f3cb436ce74055333e71db3c09cb12acc7a60d1",
+      "excluded_matches": 258,
+      "input_match_count": 4567,
+      "lineage_sha256": {
+        "draft_observation_quality_report.json": "10fbbd838a6c632412a815d339a19a0f2a36caba3f5b7c7b8259fbf138bcdd21",
+        "match_draft_context.jsonl": "07af2ab8c251d3ebbe277999d8005bd084a1da7d45ef5dc85ec5d60477c12b8c",
+        "metadata.json": "ab8982d1f8ce261ed660e8b81ff5e64effa94e5a48c443d87f256d629c0b8d4d",
+        "participant_draft_observations.jsonl": "bd7d5d22ed28d413cfcf98d77d9cd11d4030ce3eeb4177581fbad22c81fb8541",
+        "team_draft_observations.jsonl": "4d920c1e5322fe104b7197dfa003d23a25b13ff03e9edddbe4e2992a20fb9810"
+      },
+      "platform": "euw1",
+      "source_kind": "external"
+    },
+    {
+      "accepted_patch_26_15_matches": 433,
+      "analysis_region": "euw",
+      "composition_eligible_matches": 405,
+      "declared_tree_sha256": null,
+      "excluded_matches": 28,
+      "input_match_count": 1000,
+      "lineage_sha256": {
+        "draft_observation_quality_report.json": "a70cfd69af21759799529b68b0de402eda8196614bc1f16559a23fbfdc229cc5",
+        "match_draft_context.jsonl": "e6d12a5881bcaf58d877d3972acaebb4131a95de7a620969b6e812eae3878ba7",
+        "metadata.json": "8bdbcfb0f2fe58a4691f5f38acae1919377c8cd058b638fd88c563a14cd2abad",
+        "participant_draft_observations.jsonl": "e2d9f63738fb582626f21646b3c2dcc22e2e459476189692357305e81955ae11",
+        "team_draft_observations.jsonl": "d033554d2f0623c47ba64046372d0f5b5ae77be5620d975eefcd10df435f79b0"
+      },
+      "platform": "euw1",
+      "source_kind": "retained_private"
+    }
+  ],
+  "selected_l2": {
+    "composition_only": 0.1,
+    "composition_plus_lane_matchups": 0.1
+  },
+  "software": {
+    "numpy": "2.5.1",
+    "python": "3.12.10",
+    "scipy": "1.18.0"
+  },
+  "source_tags": {
+    "final_data_seal": {
+      "peeled_commit": "86956725fe55f45534bfec0543ff33bc4b858793",
+      "tag": "stage3.4a-patch26.15-10k-data-v1"
+    },
+    "scientific_method_freeze": {
+      "peeled_commit": "59d13d5023af2e64c48e74c261d3ee64736ffd52",
+      "tag": "stage3.4a-pre-26.16-v1"
+    }
+  },
+  "status": "patch_26_15_development_not_final_test",
+  "target": {
+    "definition": "lower_numeric_team_wins",
+    "orientation": "lower_numeric_team_is_allied",
+    "type": "binary"
+  }
+}

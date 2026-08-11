@@ -1,0 +1,10 @@
+{
+  "current_tracemalloc_bytes": null,
+  "deterministic_bundle_sha256": "985e780325b1514870af1ca3c45ccb666b65121b99785871b208b7f7a7429e9b",
+  "memory_measurement": "not_collected; whole-run Python allocation tracing is excluded because it can dominate sparse optimizer runtime",
+  "peak_tracemalloc_bytes": null,
+  "process_cpu_seconds": 58.125,
+  "repository_commit": "c70ab05d6b250568edb8260bdfca2ae6acf2bb15",
+  "schema_version": "stage3.4a-pooled-development-execution-v1",
+  "wall_seconds": 58.2595839999849
+}
