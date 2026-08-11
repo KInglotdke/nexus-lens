@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -41,12 +42,51 @@ def _parser() -> argparse.ArgumentParser:
         help="Verify sources, counts, union hash, and folds without fitting or writing",
     )
     mode.add_argument("--validate-only", action="store_true")
+    parser.add_argument(
+        "--diagnostic-log",
+        type=Path,
+        help=(
+            "Write privacy-safe phase/counter JSONL outside the scientific output "
+            "directory; the path must not already exist"
+        ),
+    )
     return parser
+
+
+class _DiagnosticLog:
+    def __init__(self, path: Path) -> None:
+        self._handle = path.open("x", encoding="utf-8", newline="\n")
+
+    def __call__(self, event: dict[str, object]) -> None:
+        self._handle.write(json.dumps(event, sort_keys=True, allow_nan=False) + "\n")
+        self._handle.flush()
+
+    def close(self) -> None:
+        self._handle.close()
+
+
+def _diagnostic_callback(
+    path: Path | None, output_directory: Path
+) -> _DiagnosticLog | None:
+    if path is None:
+        return None
+    resolved = path.resolve()
+    output = output_directory.resolve()
+    if resolved == output or output in resolved.parents:
+        raise ValueError("diagnostic log must be outside the scientific output")
+    if resolved.exists():
+        raise ValueError("diagnostic log already exists")
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    return _DiagnosticLog(resolved)
 
 
 def main() -> int:
     args = _parser().parse_args()
+    diagnostic = None
     try:
+        diagnostic = _diagnostic_callback(
+            args.diagnostic_log, args.output_directory
+        )
         protocol = load_protocol(args.protocol)
         pooled = load_pooled_input(
             protocol=protocol,
@@ -88,9 +128,12 @@ def main() -> int:
                 protocol_tag_object=args.protocol_tag_object,
                 protocol_tag_commit=args.protocol_tag_commit,
             ),
+            progress_callback=diagnostic,
         )
         if not args.validate_only:
-            write_pooled_development_result(result)
+            write_pooled_development_result(
+                result, progress_callback=diagnostic
+            )
     except Stage3ValidationError as error:
         print(
             f"Pooled development failed closed: category={error.category}; "
@@ -104,6 +147,9 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
+    finally:
+        if diagnostic is not None:
+            diagnostic.close()
     mode = "validation only; no files written" if args.validate_only else "published"
     print("Nexus Lens pooled patch-26.15 development baseline")
     print(f"  mode: {mode}")

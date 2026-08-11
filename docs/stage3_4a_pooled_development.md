@@ -75,3 +75,16 @@ Execution artifacts record wall and process CPU time. Whole-run Python allocatio
 tracing is deliberately not enabled: it is non-scientific instrumentation and can
 dominate sparse optimizer runtime. The execution record marks memory measurement as
 unavailable rather than reporting a misleading value.
+
+The frozen execution performs 112 fits per invocation: 90 in outer nested
+evaluation, 20 in final all-development L2 selection, and 2 final all-data fits.
+Bootstrap replicates resample the already-created out-of-fold predictions and never
+refit a model. `--validate-only` and publication both execute those same 112 fits;
+publication then serializes and atomically writes the in-memory result. A prior
+validation-only invocation cannot be reused by a later process.
+
+For operational diagnosis, `scripts/run_pooled_development.py --diagnostic-log PATH`
+writes bounded privacy-safe JSONL progress outside the scientific result directory.
+It records fit number, fold, model, L2 candidate, optimizer completion, bootstrap
+progress, final fitting, artifact construction, and publication timing. It contains
+no match or player identifiers and is not a scientific artifact.

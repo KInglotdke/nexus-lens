@@ -94,6 +94,7 @@ def test_selection_is_fold_local_and_platform_is_not_a_feature(tmp_path: Path) -
 
 def test_pooled_development_is_deterministic_private_and_immutable(
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
     drafts = _pooled_drafts(tmp_path)
     pooled = PooledInput(
@@ -112,6 +113,39 @@ def test_pooled_development_is_deterministic_private_and_immutable(
         max_iterations=200,
     )
     protocol["optimizer"]["maximum_iterations"] = 200
+    real_fit = pooled_modeling.fit_composition_model
+    real_prediction_records = pooled_modeling._prediction_records
+    fit_calls = 0
+    fit_schedule = []
+    prediction_batches = []
+
+    def counted_fit(*args, **kwargs):
+        nonlocal fit_calls
+        fit_calls += 1
+        fit_schedule.append(
+            (
+                kwargs["variant"],
+                kwargs["l2_strength"],
+                kwargs["max_iterations"],
+                kwargs["tolerance"],
+                len(args[0]),
+            )
+        )
+        return real_fit(*args, **kwargs)
+
+    def recorded_predictions(*args, **kwargs):
+        rows = real_prediction_records(*args, **kwargs)
+        prediction_batches.append(
+            tuple(
+                (row.platform, row.match_id, row.outcome, row.probability)
+                for row in rows
+            )
+        )
+        return rows
+
+    monkeypatch.setattr(pooled_modeling, "fit_composition_model", counted_fit)
+    monkeypatch.setattr(pooled_modeling, "_prediction_records", recorded_predictions)
+    progress_events: list[dict[str, object]] = []
 
     first = build_pooled_development_result(
         pooled=pooled,
@@ -119,6 +153,27 @@ def test_pooled_development_is_deterministic_private_and_immutable(
         protocol_path=PROTOCOL_PATH,
         output_directory=tmp_path / "results",
         config=config,
+        progress_callback=progress_events.append,
+    )
+    assert fit_calls == 112
+    first_fit_schedule = tuple(fit_schedule)
+    first_prediction_batches = tuple(prediction_batches)
+    assert len(
+        [row for row in progress_events if row["event"] == "model_fit_completed"]
+    ) == 112
+    bootstrap_start = next(
+        index
+        for index, row in enumerate(progress_events)
+        if row["event"] == "bootstrap_started"
+    )
+    bootstrap_end = next(
+        index
+        for index, row in enumerate(progress_events)
+        if row["event"] == "bootstrap_completed"
+    )
+    assert not any(
+        row["event"] == "model_fit_started"
+        for row in progress_events[bootstrap_start : bootstrap_end + 1]
     )
     second = build_pooled_development_result(
         pooled=pooled,
@@ -126,6 +181,11 @@ def test_pooled_development_is_deterministic_private_and_immutable(
         protocol_path=PROTOCOL_PATH,
         output_directory=tmp_path / "results",
         config=config,
+    )
+    assert fit_calls == 224
+    assert tuple(fit_schedule[112:]) == first_fit_schedule
+    assert tuple(prediction_batches[len(first_prediction_batches) :]) == (
+        first_prediction_batches
     )
 
     assert first.deterministic_bundle_sha256 == second.deterministic_bundle_sha256
@@ -153,7 +213,17 @@ def test_pooled_development_is_deterministic_private_and_immutable(
         is False
     )
 
-    write_pooled_development_result(first)
+    fits_before_publication = fit_calls
+    publication_events: list[dict[str, object]] = []
+    write_pooled_development_result(
+        first, progress_callback=publication_events.append
+    )
+    assert fit_calls == fits_before_publication
+    assert [row["event"] for row in publication_events] == [
+        "publication_started",
+        "publication_payloads_serialized",
+        "publication_completed",
+    ]
     before = {
         path.name: path.read_bytes()
         for path in first.output_directory.iterdir()

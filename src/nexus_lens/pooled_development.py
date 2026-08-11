@@ -13,6 +13,7 @@ import sys
 import tempfile
 import time
 from collections import Counter, defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from statistics import mean
@@ -55,6 +56,62 @@ DETERMINISTIC_FILES = (
     "experiment_manifest.json",
     "development_report.md",
 )
+ProgressCallback = Callable[[dict[str, Any]], None]
+
+
+class _ProgressReporter:
+    """Emit bounded, privacy-safe execution diagnostics outside result artifacts."""
+
+    def __init__(self, callback: ProgressCallback | None) -> None:
+        self.callback = callback
+        self.started_wall = time.perf_counter()
+        self.started_cpu = time.process_time()
+        self.fit_count = 0
+
+    def emit(self, event: str, **fields: Any) -> None:
+        if self.callback is None:
+            return
+        self.callback(
+            {
+                "event": event,
+                "elapsed_wall_seconds": time.perf_counter() - self.started_wall,
+                "elapsed_process_cpu_seconds": time.process_time()
+                - self.started_cpu,
+                **fields,
+            }
+        )
+
+    def fit_started(self, *, phase: str, variant: str, **fields: Any) -> float:
+        self.fit_count += 1
+        self.emit(
+            "model_fit_started",
+            fit_number=self.fit_count,
+            phase=phase,
+            variant=variant,
+            **fields,
+        )
+        return time.perf_counter()
+
+    def fit_completed(
+        self,
+        *,
+        phase: str,
+        variant: str,
+        started: float,
+        optimizer_iterations: int,
+        optimizer_status: str,
+        **fields: Any,
+    ) -> None:
+        self.emit(
+            "model_fit_completed",
+            fit_number=self.fit_count,
+            phase=phase,
+            variant=variant,
+            fit_wall_seconds=time.perf_counter() - started,
+            optimizer_iterations=optimizer_iterations,
+            optimizer_status=optimizer_status,
+            **fields,
+        )
 
 
 @dataclass(frozen=True)
@@ -319,12 +376,21 @@ def build_pooled_development_result(
     protocol_path: Path,
     output_directory: Path,
     config: PooledDevelopmentConfig,
+    progress_callback: ProgressCallback | None = None,
 ) -> PooledDevelopmentResult:
     """Run deterministic nested development evaluation and final all-data fitting."""
 
     _validate_protocol(protocol, config)
     started_wall = time.perf_counter()
     started_cpu = time.process_time()
+    progress = _ProgressReporter(progress_callback)
+    expected_fit_count = _expected_model_fit_count(config)
+    progress.emit(
+        "experiment_started",
+        observations=len(pooled.observations),
+        expected_model_fits=expected_fit_count,
+        bootstrap_replicates=config.bootstrap_replicates,
+    )
     try:
         outer_plan = construct_fold_plan(
             pooled.observations,
@@ -337,6 +403,7 @@ def build_pooled_development_result(
         }
         outer_results = []
         unseen = {variant: _empty_unseen_counter() for variant in MODEL_VARIANTS}
+        progress.emit("outer_nested_evaluation_started")
         for outer_index in range(config.outer_folds):
             training = _partition(pooled.observations, outer_plan, outer_index, False)
             validation = _partition(pooled.observations, outer_plan, outer_index, True)
@@ -347,6 +414,12 @@ def build_pooled_development_result(
                 scope_label=f"inner-outer-{outer_index}",
             )
             model_rows = []
+            progress.emit(
+                "outer_fold_started",
+                outer_fold=outer_index,
+                training_matches=len(training),
+                validation_matches=len(validation),
+            )
             for variant in MODEL_VARIANTS:
                 selected, candidates = select_l2_on_plan(
                     training,
@@ -355,6 +428,14 @@ def build_pooled_development_result(
                     l2_candidates=L2_CANDIDATES,
                     max_iterations=config.max_iterations,
                     tolerance=config.optimizer_tolerance,
+                    progress=progress,
+                    phase=f"outer_{outer_index}_inner_selection",
+                )
+                fit_started = progress.fit_started(
+                    phase="outer_evaluation_fit",
+                    variant=variant,
+                    outer_fold=outer_index,
+                    training_matches=len(training),
                 )
                 model = fit_composition_model(
                     training,
@@ -362,6 +443,14 @@ def build_pooled_development_result(
                     l2_strength=selected,
                     max_iterations=config.max_iterations,
                     tolerance=config.optimizer_tolerance,
+                )
+                progress.fit_completed(
+                    phase="outer_evaluation_fit",
+                    variant=variant,
+                    started=fit_started,
+                    optimizer_iterations=model.optimizer_iterations,
+                    optimizer_status=model.optimizer_status,
+                    outer_fold=outer_index,
                 )
                 records = _prediction_records(variant, model, validation)
                 oof_records[variant].extend(records)
@@ -389,6 +478,11 @@ def build_pooled_development_result(
                     "models": model_rows,
                 }
             )
+            progress.emit("outer_fold_completed", outer_fold=outer_index)
+
+        progress.emit(
+            "outer_nested_evaluation_completed", completed_model_fits=progress.fit_count
+        )
 
         ordered_records = {
             variant: sorted(rows, key=lambda row: (row.platform, row.match_id))
@@ -402,12 +496,15 @@ def build_pooled_development_result(
                 "pooled_oof_coverage_conflict",
                 "OOF predictions do not cover every draft",
             )
+        progress.emit("development_metrics_started")
         development_metrics = _development_metrics(
             ordered_records,
             calibration_bins=config.calibration_bins,
             bootstrap_replicates=config.bootstrap_replicates,
             bootstrap_seed=config.bootstrap_seed,
+            progress=progress,
         )
+        progress.emit("development_metrics_completed")
         final_plan = construct_fold_plan(
             pooled.observations,
             fold_count=config.final_selection_folds,
@@ -416,6 +513,7 @@ def build_pooled_development_result(
         )
         final_model_rows = []
         final_selection = []
+        progress.emit("final_selection_started")
         for variant in MODEL_VARIANTS:
             selected, candidates = select_l2_on_plan(
                 pooled.observations,
@@ -424,6 +522,13 @@ def build_pooled_development_result(
                 l2_candidates=L2_CANDIDATES,
                 max_iterations=config.max_iterations,
                 tolerance=config.optimizer_tolerance,
+                progress=progress,
+                phase="final_all_development_selection",
+            )
+            fit_started = progress.fit_started(
+                phase="final_all_data_fit",
+                variant=variant,
+                training_matches=len(pooled.observations),
             )
             model = fit_composition_model(
                 pooled.observations,
@@ -431,6 +536,13 @@ def build_pooled_development_result(
                 l2_strength=selected,
                 max_iterations=config.max_iterations,
                 tolerance=config.optimizer_tolerance,
+            )
+            progress.fit_completed(
+                phase="final_all_data_fit",
+                variant=variant,
+                started=fit_started,
+                optimizer_iterations=model.optimizer_iterations,
+                optimizer_status=model.optimizer_status,
             )
             final_selection.append(
                 {
@@ -440,7 +552,17 @@ def build_pooled_development_result(
                 }
             )
             final_model_rows.append(_serialize_model(model))
+        progress.emit(
+            "final_selection_and_fitting_completed",
+            completed_model_fits=progress.fit_count,
+        )
+        if progress.fit_count != expected_fit_count:
+            raise Stage3ValidationError(
+                "pooled_model_fit_count_conflict",
+                "executed model-fit count differs from the frozen execution plan",
+            )
 
+        progress.emit("deterministic_artifact_construction_started")
         metrics = {
             "schema_version": RESULT_SCHEMA_VERSION,
             "status": "patch_26_15_nested_cv_development_estimate_not_final_test",
@@ -511,6 +633,10 @@ def build_pooled_development_result(
             "current_tracemalloc_bytes": None,
             "peak_tracemalloc_bytes": None,
         }
+        progress.emit(
+            "deterministic_artifact_construction_completed",
+            deterministic_bundle_sha256=deterministic_bundle,
+        )
     finally:
         pass
     _reject_nonfinite(
@@ -522,6 +648,7 @@ def build_pooled_development_result(
             "execution": execution,
         }
     )
+    progress.emit("experiment_completed", completed_model_fits=progress.fit_count)
     return PooledDevelopmentResult(
         output_directory=output_directory,
         metrics=metrics,
@@ -542,9 +669,12 @@ def select_l2_on_plan(
     l2_candidates: tuple[float, ...],
     max_iterations: int,
     tolerance: float,
+    progress: _ProgressReporter | None = None,
+    phase: str = "l2_selection",
 ) -> tuple[float, list[dict[str, Any]]]:
     """Select L2 using only the supplied training partition and fold plan."""
 
+    reporter = progress or _ProgressReporter(None)
     fold_indexes = sorted(set(plan.assignments.values()))
     results = []
     for strength in sorted(l2_candidates):
@@ -558,12 +688,28 @@ def select_l2_on_plan(
                     "pooled_empty_selection_partition",
                     "L2 selection partition is empty",
                 )
+            fit_started = reporter.fit_started(
+                phase=phase,
+                variant=variant,
+                l2_strength=strength,
+                selection_fold=fold_index,
+                training_matches=len(training),
+            )
             model = fit_composition_model(
                 training,
                 variant=variant,
                 l2_strength=strength,
                 max_iterations=max_iterations,
                 tolerance=tolerance,
+            )
+            reporter.fit_completed(
+                phase=phase,
+                variant=variant,
+                started=fit_started,
+                optimizer_iterations=model.optimizer_iterations,
+                optimizer_status=model.optimizer_status,
+                l2_strength=strength,
+                selection_fold=fold_index,
             )
             fold_losses = [
                 _binary_log_loss(predict_probability(model, row), row.outcome)
@@ -601,11 +747,32 @@ def select_l2_on_plan(
     return max(float(row["l2_strength"]) for row in tied), results
 
 
-def write_pooled_development_result(result: PooledDevelopmentResult) -> Path:
+def _expected_model_fit_count(config: PooledDevelopmentConfig) -> int:
+    per_outer_fold = len(MODEL_VARIANTS) * (
+        config.inner_folds * len(L2_CANDIDATES) + 1
+    )
+    final_selection_and_fit = len(MODEL_VARIANTS) * (
+        config.final_selection_folds * len(L2_CANDIDATES) + 1
+    )
+    return config.outer_folds * per_outer_fold + final_selection_and_fit
+
+
+def write_pooled_development_result(
+    result: PooledDevelopmentResult,
+    *,
+    progress_callback: ProgressCallback | None = None,
+) -> Path:
     """Publish deterministic artifacts atomically; never replace unequal output."""
 
+    progress = _ProgressReporter(progress_callback)
+    progress.emit("publication_started")
     payloads = _result_payloads(result)
     total_bytes = sum(len(value) for value in payloads.values())
+    progress.emit(
+        "publication_payloads_serialized",
+        artifact_count=len(payloads),
+        total_bytes=total_bytes,
+    )
     if total_bytes > 10_000_000:
         raise Stage3ValidationError(
             "pooled_publication_too_large", "safe JSON publication exceeds 10 MB"
@@ -626,8 +793,10 @@ def write_pooled_development_result(result: PooledDevelopmentResult) -> Path:
                         "immutable_pooled_output_conflict",
                         "existing deterministic pooled result differs",
                     )
+            progress.emit("publication_existing_output_verified")
             return target
         os.replace(staging, target)
+        progress.emit("publication_completed", artifact_count=len(payloads))
         return target
     finally:
         if staging.exists():
@@ -806,6 +975,7 @@ def _development_metrics(
     calibration_bins: int,
     bootstrap_replicates: int,
     bootstrap_seed: int,
+    progress: _ProgressReporter | None = None,
 ) -> dict[str, Any]:
     output = {}
     for variant, records in records_by_variant.items():
@@ -830,6 +1000,7 @@ def _development_metrics(
         calibration_bins=calibration_bins,
         replicates=bootstrap_replicates,
         seed=bootstrap_seed,
+        progress=progress,
     )
     for variant in output:
         output[variant]["confidence_intervals"] = intervals[variant]
@@ -842,6 +1013,7 @@ def _stratified_bootstrap(
     calibration_bins: int,
     replicates: int,
     seed: int,
+    progress: _ProgressReporter | None = None,
 ) -> dict[str, Any]:
     lookups = {
         variant: {(row.platform, row.match_id): row for row in records}
@@ -857,6 +1029,8 @@ def _stratified_bootstrap(
             "pooled_model_oof_set_conflict", "models evaluated different match sets"
         )
     rng = random.Random(seed)
+    reporter = progress or _ProgressReporter(None)
+    reporter.emit("bootstrap_started", bootstrap_replicates=replicates)
     samples: dict[str, dict[str, dict[str, list[float]]]] = {
         variant: {
             "overall": defaultdict(list),
@@ -866,7 +1040,8 @@ def _stratified_bootstrap(
         }
         for variant in records_by_variant
     }
-    for _ in range(replicates):
+    progress_interval = max(1, min(25, replicates))
+    for replicate_index in range(replicates):
         sampled = {
             platform: [rng.choice(keys) for _ in keys]
             for platform, keys in identities.items()
@@ -897,6 +1072,14 @@ def _stratified_bootstrap(
                     value = metrics[metric]
                     if value is not None:
                         samples[variant][scope][metric].append(float(value))
+        completed = replicate_index + 1
+        if completed % progress_interval == 0 or completed == replicates:
+            reporter.emit(
+                "bootstrap_progress",
+                completed_replicates=completed,
+                total_replicates=replicates,
+            )
+    reporter.emit("bootstrap_completed", completed_replicates=replicates)
     return {
         variant: {
             scope: {
