@@ -1,0 +1,99 @@
+{
+  "collection_policy": {
+    "deterministic_sampling": true,
+    "divisions": [
+      "I",
+      "II",
+      "III",
+      "IV"
+    ],
+    "platforms_pooled": false,
+    "queue_id": 420,
+    "sampling_strategy": "balanced_tier_division_round_robin",
+    "seed": 42,
+    "tiers": [
+      "GOLD",
+      "PLATINUM",
+      "EMERALD",
+      "DIAMOND"
+    ]
+  },
+  "milestone_id": "patch26.15-eune-euw-10000-v1",
+  "pre_collection_scientific_freeze": {
+    "dependency_lock_sha256": "03e87094cf5591417eb57808e8bac3e5c187ef901ae875685a0871a12a811b18",
+    "eune_freeze_sha256": "86d4e01210f601d9fa05774c6709bee55b8a0a9b4bd1950d7a464bc13056bc39",
+    "euw_freeze_sha256": "f3732b9f1fb43fb0ef126dddc1e30514382fb302e0643a76857a33d1030fb783",
+    "peeled_commit": "59d13d5023af2e64c48e74c261d3ee64736ffd52",
+    "prospective_sample_size_sha256": "398e40b0b784c14cc79e1a266a34c3b319b62441108d779c974ad27f639bf62a",
+    "tag": "stage3.4a-pre-26.16-v1"
+  },
+  "privacy": {
+    "aggregate_only_repository_record": true,
+    "credentials_included": false,
+    "external_data_included": false,
+    "player_names_or_riot_identifiers_included": false,
+    "pseudonymous_player_keys_included": false,
+    "raw_filenames_included": false
+  },
+  "public_patch": "26.15",
+  "queue_id": 420,
+  "regions": {
+    "eune": {
+      "accepted_retained_overlap": 0,
+      "accepted_set_sha256": "f2670d2ca75b03418e7f406070f21defe65799b3e79bf831464922a7b6efa662",
+      "analysis_region": "eune",
+      "combined_unique_matches": 5000,
+      "critical_file_sha256": {
+        "catalog": "db2deb025b8266179870ab508dcf0c2d6941eb96349aef7bf6bd667808cefe25",
+        "checkpoint": "6e2dbe6ebd0be8aac3c21130c69b6ab3ff5c8df434933b8c54db1a9d724633f1",
+        "manifest": "9031036184bc69eb356361ecb8d2cd47bd152d9dbb785b2858f145451b100866"
+      },
+      "external_accepted_matches": 4589,
+      "final_snapshot": "accepted-4589",
+      "inventory": {
+        "byte_count": 1740139074,
+        "file_count": 20031,
+        "full_current_recomputation": false,
+        "historical_algorithm_metadata_available": false,
+        "sha256": "37a9c2ab1def3e57da4ea56b198336d15774735a3017de9b57986a4bcd634538",
+        "verification": "previously_recorded_seal; aggregate file and byte counts reverified; full content recomputation blocked by protected recovery subtree"
+      },
+      "platform": "eun1",
+      "publication_sha256": {
+        "lineage": "90915c52ae3751bd26208bb41773993df5354b12ae3281277ae2b9a5dc3b7bcf",
+        "stage3_1": "c37ea4949d26a0b422c141f18ddb9553f18e548a59818eb451ddaccf46a9189a",
+        "stage3_2": "3f0af22bfbb136545163581fdd8b2debd8ac9ea4dfafa42b0682ffc2a87421db",
+        "stage3_3a": "3bd0b9dfc047aa5b206d3a93d2d8b759274a1a0fae7c4de9ae79eb014f757e1c",
+        "stage3_3b": "e15220217a9e14a93146195c027d9206439482d109369c8e31dd68f8d8d219ff"
+      },
+      "regional_routing": "europe",
+      "retained_private_matches": 411,
+      "retained_set_sha256": "2b78ecebce03baa26081ef836270e71bb0cb9aa847bf19be9cb19ae3937f89f2",
+      "run_id": "20260806T150447912952Z-population"
+    },
+    "euw": {
+      "accepted_retained_overlap": 0,
+      "accepted_set_sha256": "29398ac95829b0db26a785b80fad5663c482ca145171c1ad737fe60ac2138077",
+      "analysis_region": "euw",
+      "combined_unique_matches": 5000,
+      "external_accepted_matches": 4567,
+      "final_snapshot": "accepted-4567",
+      "platform": "euw1",
+      "regional_routing": "europe",
+      "retained_private_matches": 433,
+      "retained_set_sha256": "1980b9b35d5a1e45127d590a04a1264fc165c83e8f5dcf5ea3160b9f31f87197",
+      "run_id": "20260806T150524583437Z-population",
+      "seal_manifest": "config/data_seals/patch26.15-10k-v1/euw.data-seal.json"
+    }
+  },
+  "schema_version": "nexus-lens-dataset-milestone-v1",
+  "scientific_state_at_seal": {
+    "model_fitted_or_evaluated": false,
+    "patch_26_16_included": false,
+    "recommendation_policy_selected": false,
+    "seal_type": "post_collection_data_and_provenance_milestone"
+  },
+  "source_repository_commit": "81a2069455c309f6f163be5116f752b2b2124cf7",
+  "status": "sealed",
+  "total_regional_match_observations": 10000
+}

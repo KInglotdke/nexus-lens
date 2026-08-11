@@ -162,6 +162,15 @@ invariant still applies. Partial publications use an accepted-count snapshot roo
 later resumes do not collide with immutable Stage 3 outputs. See
 [external collection operations](docs/external_collection.md).
 
+### Patch 26.15 data milestone
+
+The final patch-26.15 training population is sealed at 5,000 unique queue-420 match
+observations for EUNE and 5,000 for EUW. Regions remain isolated, no patch-26.16 data
+is included, and no model or recommendation policy was fitted before sealing. The
+post-collection provenance record and its distinction from the earlier prospective
+scientific freeze are documented in
+[the patch-26.15 data seal](docs/patch26_15_data_seal.md).
+
 ## Stage 3.2: deterministic analytical features
 
 Stage 3.2 reads only a completed, compatible Stage 3.1 run. It validates all six

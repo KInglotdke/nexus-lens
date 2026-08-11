@@ -1,0 +1,108 @@
+{
+  "collection_policy": {
+    "concurrency": 1,
+    "deterministic_sampling": true,
+    "divisions": [
+      "I",
+      "II",
+      "III",
+      "IV"
+    ],
+    "newest_first_history": true,
+    "sampling_strategy": "balanced_tier_division_round_robin",
+    "seed": 42,
+    "stop_on_newer_patch": true,
+    "tiers": [
+      "GOLD",
+      "PLATINUM",
+      "EMERALD",
+      "DIAMOND"
+    ]
+  },
+  "critical_files": {
+    "catalog": {
+      "logical_path": "euw/processed/catalog.sqlite3",
+      "sha256": "d469d15ea1321c6c754d4cf03b3862a8fb8f5fc3805c6a7bfa9bf5aca7113942"
+    },
+    "checkpoint": {
+      "logical_path": "euw/snapshots/population/20260806T150524583437Z-population/checkpoint.json",
+      "sha256": "aeb4c52a1623cb304b6a6d2e78ab50a348a04f0d4ead5b3c7f5d0b5a23b5a60e"
+    },
+    "manifest": {
+      "logical_path": "euw/raw/20260806T150524583437Z-population/manifest.json",
+      "sha256": "43fc2ab39f3bc8a6da354de199399957b2e4644925665ea7c7626e42f2a7dec3"
+    }
+  },
+  "dataset": {
+    "accepted_retained_overlap": 0,
+    "accepted_set_sha256": "29398ac95829b0db26a785b80fad5663c482ca145171c1ad737fe60ac2138077",
+    "analysis_region": "euw",
+    "combined_unique_matches": 5000,
+    "external_accepted_matches": 4567,
+    "participants_per_accepted_match": 10,
+    "platform": "euw1",
+    "public_patch": "26.15",
+    "queue_id": 420,
+    "regional_routing": "europe",
+    "retained_private_matches": 433,
+    "retained_set_sha256": "1980b9b35d5a1e45127d590a04a1264fc165c83e8f5dcf5ea3160b9f31f87197",
+    "run_id": "20260806T150524583437Z-population",
+    "surplus_accepted_matches": 0,
+    "target_reached": true
+  },
+  "inventory": {
+    "algorithm": "sha256-relative-path-size-content-sha256-v1",
+    "byte_count": 2767335433,
+    "exclusions": [],
+    "file_count": 20171,
+    "includes_quiescent_lock_database_and_logs": true,
+    "repeated_calculations": 2,
+    "repeated_results_identical": true,
+    "scope": "all regular files recursively below logical external root euw/; empty directories are not represented",
+    "sha256": "04daf727e8f816ff95449edf2ea2a954f37c0a3062e6dafb81d83c4c9e806ba0"
+  },
+  "privacy": {
+    "aggregate_report_contains_pseudonymous_player_keys": false,
+    "credential_loaded_or_hashed_during_sealing": false,
+    "file_level_inventory_published": false,
+    "raw_identifiers_published": false,
+    "raw_payloads_or_filenames_published": false
+  },
+  "publications": {
+    "lineage": {
+      "logical_path": "euw/lineage/snapshot=accepted-4567/schema=lineage-v1/run=20260806T150524583437Z-population",
+      "sha256": "4e9176c029bf542fd2df932c2eebd7297c9fb6f9c9134c958d4e7333cc9ac0d3"
+    },
+    "stage3_1": {
+      "logical_path": "euw/processed/stage3/snapshot=accepted-4567/schema=stage3.1-v1/run=20260806T150524583437Z-population",
+      "sha256": "1228efd229bff2d7f240937dd7df7c108549d3f05c762691e551843c60309e3c"
+    },
+    "stage3_2": {
+      "logical_path": "euw/processed/stage3/snapshot=accepted-4567/schema=stage3.2-v1/run=20260806T150524583437Z-population",
+      "sha256": "f65a6d719232704c6e5f0090e744345b6c46c9e71f4f7f489b00d6c8eb759837"
+    },
+    "stage3_3a": {
+      "logical_path": "euw/processed/stage3/snapshot=accepted-4567/schema=stage3.3a-v1/run=20260806T150524583437Z-population",
+      "sha256": "bdf920dccf6cf52d563c26216f3cb436ce74055333e71db3c09cb12acc7a60d1"
+    },
+    "stage3_3b": {
+      "logical_path": "euw/processed/stage3/snapshot=accepted-4567/schema=stage3.3b-v1/run=20260806T150524583437Z-population",
+      "sha256": "d9ffe19293253a88c4ced56e0b0af92a878895379aa44b5ed181bc6018e0394d"
+    }
+  },
+  "request_accounting": {
+    "cumulative_accounted_requests": 8123,
+    "pending_failures": 0,
+    "request_ceiling": 60000,
+    "unused_allowance": 51877
+  },
+  "schema_version": "nexus-lens-data-seal-v1",
+  "seal_id": "euw-patch26.15-5000-v1",
+  "source_repository_commit": "81a2069455c309f6f163be5116f752b2b2124cf7",
+  "status": "sealed_post_collection",
+  "scientific_state": {
+    "model_fitted_or_evaluated_before_seal": false,
+    "patch_26_16_included": false,
+    "recommendation_policy_selected": false
+  }
+}
