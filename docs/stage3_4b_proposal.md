@@ -1,144 +1,142 @@
-# Prospective Stage 3.4B development proposal
+# Frozen Stage 3.4B-1 development protocol
 
-Status: **design proposal only; not implemented, fitted, tuned, or frozen**.
+Status: **prospectively frozen before any Stage 3.4B-1 fit on real data**.
 
-Patch 26.16 remains untouched. This proposal must become a versioned protocol before
-any Stage 3.4B model is fitted or any new result is inspected.
+The machine-readable contract is
+`config/evaluation/stage3.4b-1-patch26.15-protocol-v1/protocol.json`. Stage
+3.4B-1 is limited to the 9,414 already eligible patch-26.15 Ranked Solo/Duo
+drafts. It introduces no player-history features, new collection, recommendation
+policy, causal claim, or SHAP analysis.
 
-## Target and decision context
+Current planning uses the generic term **future sealed temporal holdout**. Older
+Stage 3.4A freezes and published result artifacts may retain the numbered wording
+that was historically frozen with them; those immutable files are intentionally not
+rewritten.
 
-The factual prediction target remains `P(Blue/lower-numeric team wins)` at completed
-draft time. The recommendation-facing quantity is a conditional candidate contrast:
-the change in predicted win probability when one not-yet-filled role is assigned a
-legal candidate champion while observed allied picks, enemy picks, bans, role, patch,
-and leakage-safe pre-match player state remain fixed.
+## Target and interpretation
 
-That contrast is a model output, not an identified causal treatment effect. Stage
-3.4B may evaluate predictive usefulness and ranking stability, but it must not claim
-that an unchosen champion would have changed the historical result.
+The factual target remains `P(Blue/lower-numeric team wins)` for one completed,
+role-complete draft. A later candidate-champion contrast may substitute one legal
+pick and rescore the otherwise fixed draft, but that contrast is mechanical and
+non-causal. An unselected champion has no observed historical outcome.
 
-## Candidate feature families
+## Rolling-origin design
 
-Available from already collected data without new Riot collection:
+UTC game-creation timestamps establish four adjacent outer test blocks:
 
-- an intercept-only Blue-rate baseline and the frozen signed champion-role features;
-- allied champion-role pair synergies within each team;
-- same-role lane-counter pairs with shared or hierarchical shrinkage rather than one
-  unrelated coefficient per exact pair;
-- fold-local champion-role strength estimates;
-- bans and the set of already selected champions, without reconstructed pick order;
-- platform as stratification/subgroup metadata, not automatically as a predictor;
-- public patch and canonical game creation time for prospectively defined recency
-  weighting, after a sealed lineage join to existing canonical inputs.
+| Block | Test interval `[start, end)` | EUNE | EUW | Total |
+|---|---|---:|---:|---:|
+| outer-0 | 2026-08-03 to 2026-08-05 | 669 | 616 | 1,285 |
+| outer-1 | 2026-08-05 to 2026-08-07 | 954 | 776 | 1,730 |
+| outer-2 | 2026-08-07 to 2026-08-09 | 982 | 872 | 1,854 |
+| outer-3 | 2026-08-09 to 2026-08-12 | 629 | 870 | 1,499 |
 
-Features requiring prospective pre-match player-history collection or a new sealed
-history join:
+The 3,046 drafts before the first boundary form initial unscored training data;
+6,368 drafts are scored exactly once. Each later training partition expands to
+include all earlier observations. Every fold requires at least 800 preceding drafts,
+300 from each platform, and 48 hours of preceding time. EUNE and EUW use identical
+boundaries without downsampling. Platform is subgroup and bootstrap-stratum metadata,
+never a predictive feature.
 
-- champion proficiency using only that player's matches strictly before the target
-  match creation time;
-- role familiarity and recent role frequency, also strictly historical;
-- player-specific champion-role sample size and recency;
-- prior ally familiarity or duo history when support and privacy thresholds permit;
-- independently observed rank/MMR proxies. Existing rank lineage is too sparse to
-  support this family.
+Each selection context uses three one-day inner validation intervals immediately
+before its cutoff, with all earlier observations as expanding training. Final
+configuration selection uses a 2026-08-11 UTC cutoff; the final selected model is then
+fit to all 9,414 development drafts. Identical timestamps remain in one partition.
+Vocabularies, rates, support decisions, and model selection are fold-local. No random
+cross-validation is used.
 
-Items, gold, kills, assists, damage, objectives, post-game ranks, timelines, and any
-other information unavailable at recommendation time are prohibited.
+## Baselines
 
-## Models and baselines
+All policies score the identical outer rows. The required baselines are constant
+0.5, the training-fold Blue rate, the two frozen Stage 3.4A specifications refit in
+each outer training fold, and a fold-local champion-role-rate baseline. The latter
+keeps champion-role rates with at least ten training matches, falls back to the
+training Blue rate, and uses `Blue rate + (mean Blue champion rate - mean Red
+champion rate) / 2`.
 
-Required baselines:
+The Stage 3.4A baselines use L2 0.1 and no intercept. Their previously published
+metric values are not reused because those values were produced on different folds.
 
-1. constant `0.5`;
-2. training-fold Blue win-rate intercept;
-3. frozen composition-only logistic form;
-4. frozen composition-plus-direct-matchup form;
-5. fold-local champion-role-rate baseline.
+## Candidate equations and sharing
 
-Candidate families should be introduced in ablation order:
+Let `x_B - x_R` be signed champion-role indicators and `b` the unregularized
+Blue-side intercept.
 
-1. regularized logistic regression with ally-synergy interactions;
-2. logistic regression with hierarchical champion-role and lane-pair effects that
-   share role-level and champion-level information;
-3. a low-rank factorization-machine interaction model;
-4. one bounded interaction-capable tree/boosting model, only with deterministic
-   seeds, strict capacity limits, and post-hoc calibration fitted inside training
-   folds.
+1. Composition with side intercept:
+   `s = b + w·(x_B - x_R)`. One champion-role coefficient is reused in every
+   draft and both orientations.
+2. Shared allied synergy:
+   `s = b + w·(x_B - x_R) + Σ(i<j)<u_Bi,u_Bj> -
+   Σ(i<j)<u_Ri,u_Rj>`. A small champion-role embedding is reused across all
+   allied role pairs.
+3. Shared lane counter:
+   `s = b + w·(x_B - x_R) + Σr(<a_Br,d_Rr> - <a_Rr,d_Br>)`.
+   Attack and defense embeddings pool every same-role counter interaction; reversing
+   the lane reverses its contrast.
+4. Combined: the sum of the composition, allied-synergy, and lane-counter terms
+   above under one fixed ablation grid.
 
-Each family receives a fixed prospective hyperparameter grid. Complexity is retained
-only when it beats every required baseline under the criteria below.
+For all candidates, `P(Blue wins) = sigmoid(s)`. The objective is mean binary
+logistic loss plus `0.5 * main_l2 * ||w||²` and, where present,
+`0.5 * embedding_l2` times the squared embedding norms. The side intercept is not
+regularized. Swapping teams negates every draft-dependent term, so
+`score(draft) + score(swapped) = 2b`.
 
-## Leakage controls and validation
+With 710 reference champion-role features, parameter counts are 711 for composition;
+2,131/3,551 for synergy dimensions 2/4; 3,551/6,391 for counter dimensions 2/4;
+and 4,971/9,231 for combined dimensions 2/4.
 
-- Split and score one match once; never mirror rows.
-- Use deterministic rolling-origin outer folds within patch 26.15, stratified by
-  platform and target where compatible with chronology.
-- Build vocabularies, histories, encodings, smoothing parameters, calibration, and
-  hyperparameters inside each outer training partition only.
-- For player-history features, require `history_game_creation < evaluated_game_creation`.
-- Purge overlapping history windows around fold boundaries when the same player can
-  occur on both sides of a temporal split.
-- Keep platform-specific subgroup reports and add a leave-one-platform-out stress
-  test; do not silently fit platform as a feature.
-- Freeze all seeds, grids, support thresholds, recency windows, missing-value rules,
-  and tie-breaks before fitting.
-- Preserve aggregate outputs only. OOF rows may be held ephemerally for metrics but
-  must not be published.
+## Frozen grids and numerical policy
 
-Nested rolling-origin validation remains the default: outer folds estimate
-development performance, inner chronological folds select hyperparameters. If
-player-history purging makes inner folds too small, use a single prospectively fixed
-configuration and repeated blocked outer evaluation rather than weakening temporal
-separation.
+- Composition: main L2 `{0.03, 0.1, 0.3}`.
+- Shared synergy: `(dimension, embedding L2)` `{(2, 1), (4, 3)}`, main L2 0.1.
+- Shared counter: `(dimension, embedding L2)` `{(2, 1), (4, 3)}`, main L2 0.1.
+- Combined: both latent dimensions 2 with embedding L2 1, or both dimensions 4
+  with embedding L2 3; main L2 0.1.
 
-Primary metric is paired per-match log-loss difference. Secondary metrics are Brier
-score, calibration intercept/slope, ECE, coverage, abstention, and prediction
-dispersion. Accuracy and ROC AUC are descriptive only. Report overall, EUNE, EUW,
-role, and prospectively support-binned results; suppress low-support slices.
+Only champion-role features with at least ten training matches receive embeddings.
+Unsupported embeddings are zero; unseen linear and exact-pair features contribute
+zero. L-BFGS-B uses an analytic gradient, at most 300 iterations, tolerance `1e-8`,
+and deterministic centered-normal embedding initialization at scale 0.01 from seed
+34401. Any non-convergence or non-finite value fails closed.
 
-## Candidate-ranking evaluation
+Selection minimizes the unweighted mean of three inner-fold log losses. Ties within
+`1e-12` choose, in order, larger embedding L2, larger main L2, smaller total latent
+dimension, then lexicographically smaller configuration ID. Calibration intercept
+and slope are unregularized metric-only regressions; predictions are not recalibrated.
+ECE uses ten fixed equal-width bins.
 
-Historical data reveal an outcome only for the chosen draft, not for alternative
-champions. Therefore:
+## Paired uncertainty and publication
 
-- factual win-prediction evaluation can test calibration and discrimination;
-- masked-pick reconstruction can test whether a model ranks the observed legal pick
-  plausibly, but measures pick behavior rather than win utility;
-- counterfactual rank stability can be tested across folds, seeds, nearby time
-  windows, and support perturbations without claiming correctness;
-- matched or propensity-weighted observational comparisons may be reported only as
-  sensitivity analyses because draft choice is confounded and logging propensities
-  are unavailable;
-- actual recommendation benefit ultimately requires a prospective randomized or
-  carefully interleaved user study with consent and predeclared outcomes.
+The primary comparison is paired per-match log-loss difference. Brier score,
+calibration intercept/slope, ECE, prediction dispersion, coverage, platform results,
+and outer-block results are also retained. Two thousand match-level bootstrap
+replicates use seed 34201 and resample within platform × outer-block strata. Every
+candidate-versus-every-baseline log-loss and Brier interval is stored in aggregate.
+Bootstrap performs zero model fits.
 
-No offline metric may relabel an unobserved alternative as a win or loss.
+OOF rows may exist only ephemerally. Publication is aggregate-only and excludes match
+IDs, player identifiers, external paths, and low-support named slices. Named summaries
+require support of at least 100.
 
-## Predeclared material-usefulness gate
+The fixed budget is 171 predictive training operations: exactly 163 optimizer fits
+and eight analytic fold-local baseline estimates. Metric calculation makes 63
+calibration evaluations. Constant-prediction scopes are resolved analytically, so
+these add at most 63 optimizer fits and the complete run has at most 226 optimizer
+invocations. Bootstrap adds none. The pre-run estimate is 15–35 CPU minutes and at
+most 1 GiB peak memory.
 
-Before patch 26.16 can be accessed, one locked Stage 3.4B candidate must satisfy all
-of the following on patch-26.15 outer-fold development predictions:
+## Material-usefulness gate
 
-- overall paired log loss improves by at least `0.0020` versus both the Blue-rate
-  intercept and frozen composition-only baseline;
-- the paired 95% bootstrap upper bound for each of those log-loss differences is
-  below `0`;
-- overall Brier score improves by at least `0.0010` versus both baselines;
-- EUNE and EUW each improve log loss by at least `0.0010` versus composition-only,
-  with neither platform worse than the Blue-rate intercept;
-- overall ECE is at most `0.020`, calibration slope is between `0.8` and `1.2`, and
-  calibration intercept magnitude is at most `0.02`;
-- candidate-model coverage is at least `95%` of role-complete drafts and no
-  prospectively declared role loses more than five percentage points of coverage;
-- the direction of improvement repeats in at least two chronological outer blocks;
-- all leakage, determinism, privacy, convergence, and finite-value gates pass.
+A candidate must pass every frozen gate: paired log-loss improvements of at least
+0.002 versus both the Blue-rate and composition baselines with both 95% interval upper
+bounds below zero; Brier improvements of at least 0.001 versus both; at least 0.001
+log-loss improvement versus composition on each platform with neither platform worse
+than the Blue-rate baseline; ECE at most 0.02; calibration slope 0.8–1.2; absolute
+calibration intercept at most 0.02; at least 95% coverage; no role coverage drop over
+five percentage points; improvement in at least two outer blocks; and all leakage,
+determinism, privacy, convergence, and finite-value gates.
 
-These thresholds are design decisions recorded before Stage 3.4B results. They may
-be revised only by a new prospective protocol before fitting, never after observing
-the candidate result.
-
-Patch 26.16 may be used once, without retraining or tuning, only after the complete
-Stage 3.4B protocol, feature implementation, fitted final model, support policy, and
-evaluation command are sealed and the material-usefulness gate above is met. Failure
-to meet the gate keeps patch 26.16 untouched and returns the project to development
-design rather than temporal testing.
+A future sealed temporal holdout may be evaluated only after one prospectively frozen
+Stage 3.4B candidate passes every material-usefulness, leakage, determinism, privacy,
+convergence and coverage gate.
