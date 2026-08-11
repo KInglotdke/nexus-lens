@@ -129,6 +129,9 @@ def test_pooled_development_is_deterministic_private_and_immutable(
     )
 
     assert first.deterministic_bundle_sha256 == second.deterministic_bundle_sha256
+    assert first.execution_record["current_tracemalloc_bytes"] is None
+    assert first.execution_record["peak_tracemalloc_bytes"] is None
+    assert first.execution_record["memory_measurement"].startswith("not_collected")
     assert first.metrics == second.metrics
     assert first.final_models == second.final_models
     assert first.experiment_manifest == second.experiment_manifest

@@ -70,3 +70,8 @@ then scored overall and by platform without retraining or tuning.
 
 The machine-readable contract is
 `config/evaluation/stage3.4a-patch26.15-pooled-dev-protocol-v1/protocol.json`.
+
+Execution artifacts record wall and process CPU time. Whole-run Python allocation
+tracing is deliberately not enabled: it is non-scientific instrumentation and can
+dominate sparse optimizer runtime. The execution record marks memory measurement as
+unavailable rather than reporting a misleading value.

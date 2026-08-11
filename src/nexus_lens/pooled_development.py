@@ -12,7 +12,6 @@ import shutil
 import sys
 import tempfile
 import time
-import tracemalloc
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -326,7 +325,6 @@ def build_pooled_development_result(
     _validate_protocol(protocol, config)
     started_wall = time.perf_counter()
     started_cpu = time.process_time()
-    tracemalloc.start()
     try:
         outer_plan = construct_fold_plan(
             pooled.observations,
@@ -500,18 +498,21 @@ def build_pooled_development_result(
             experiment_manifest
         )
         deterministic_bundle = _bundle_sha256(deterministic_payloads)
-        current, peak = tracemalloc.get_traced_memory()
         execution = {
             "schema_version": "stage3.4a-pooled-development-execution-v1",
             "repository_commit": config.repository_commit,
             "deterministic_bundle_sha256": deterministic_bundle,
             "wall_seconds": time.perf_counter() - started_wall,
             "process_cpu_seconds": time.process_time() - started_cpu,
-            "current_tracemalloc_bytes": current,
-            "peak_tracemalloc_bytes": peak,
+            "memory_measurement": (
+                "not_collected; whole-run Python allocation tracing is excluded "
+                "because it can dominate sparse optimizer runtime"
+            ),
+            "current_tracemalloc_bytes": None,
+            "peak_tracemalloc_bytes": None,
         }
     finally:
-        tracemalloc.stop()
+        pass
     _reject_nonfinite(
         {
             "metrics": metrics,
