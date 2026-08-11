@@ -240,10 +240,31 @@ def test_tiny_shared_fit_is_finite_and_deterministic() -> None:
 
     first = fit_shared_interaction_model(drafts, **kwargs)
     second = fit_shared_interaction_model(drafts, **kwargs)
+    events = []
+    counter = stage34b._FitCounter(events.append)
+    operation = counter.start(
+        phase="instrumentation-regression",
+        model="combined_shared_interactions",
+        optimizer_fit=True,
+        config_id=config.config_id,
+    )
+    instrumented = fit_shared_interaction_model(drafts, **kwargs)
+    counter.complete(
+        operation,
+        optimizer_iterations=instrumented.optimizer_iterations,
+        optimizer_status=instrumented.optimizer_status,
+        parameter_count=stage34b._shared_parameter_count(instrumented),
+    )
     probabilities = [predict_shared_probability(first, row) for row in drafts]
+    instrumented_probabilities = [
+        predict_shared_probability(instrumented, row) for row in drafts
+    ]
 
-    assert first == second
+    assert first == second == instrumented
+    assert probabilities == instrumented_probabilities
     assert all(math.isfinite(value) and 0 < value < 1 for value in probabilities)
+    assert counter.count == counter.optimizer_fits == 1
+    assert counter.analytic_operations == 0
 
 
 def test_selection_and_tie_break_are_deterministic() -> None:
@@ -274,9 +295,68 @@ def test_selection_and_tie_break_are_deterministic() -> None:
         inner_folds=folds,
         protocol=protocol,
     )
+    events = []
+    counter = stage34b._FitCounter(events.append)
+    instrumented = select_shared_config(
+        variant="composition_with_side_intercept",
+        configs=configs,
+        inner_folds=folds,
+        protocol=protocol,
+        fit_counter=counter,
+        phase="instrumentation-regression",
+    )
 
     assert first == second
+    assert first == instrumented
     assert first[0].config_id == "a-config"
+    assert counter.count == len(configs) * len(folds)
+    assert counter.optimizer_fits == counter.count
+    assert counter.analytic_operations == 0
+    assert len(
+        [
+            event
+            for event in events
+            if event["event"] == "predictive_training_operation_completed"
+        ]
+    ) == counter.count
+    assert all(
+        event.get("optimizer_status") == "converged"
+        for event in events
+        if event["event"] == "predictive_training_operation_completed"
+    )
+
+
+def test_metric_instrumentation_does_not_change_scientific_content() -> None:
+    records = tuple(
+        stage34b._PredictionRow(
+            private_key=(platform, f"private-{index}"),
+            platform=platform,
+            outer_block=f"outer-{index % 2}",
+            outcome=(index // 2) % 2,
+            probabilities={
+                policy: 0.4 + 0.02 * ((policy_index + index) % 9)
+                for policy_index, policy in enumerate(ALL_POLICIES)
+            },
+        )
+        for platform in ("eun1", "euw1")
+        for index in range(8)
+    )
+
+    without_instrumentation = stage34b._aggregate_metrics(records, 10)
+    events = []
+    calibration = stage34b._CalibrationCounter(events.append)
+    with_instrumentation = stage34b._aggregate_metrics(
+        records, 10, calibration_counter=calibration
+    )
+
+    assert without_instrumentation == with_instrumentation
+    assert stage34b._sha256_json(without_instrumentation) == stage34b._sha256_json(
+        with_instrumentation
+    )
+    assert calibration.evaluations == len(ALL_POLICIES) * 5
+    assert calibration.optimizer_fits + calibration.analytic_evaluations == (
+        calibration.evaluations
+    )
 
 
 def test_paired_bootstrap_preserves_all_comparisons_and_private_rows() -> None:

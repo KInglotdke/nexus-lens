@@ -485,6 +485,27 @@ temporal test. See
 [docs/stage3_4a_freeze.md](docs/stage3_4a_freeze.md). No 26.16 outcome was used to
 create the freeze.
 
+## Stage 3.4B-1: frozen shared-interaction development protocol
+
+Stage 3.4B-1 prospectively compares side-aware composition, shared allied-synergy,
+shared lane-counter, and combined interaction models on the existing 9,414 eligible
+patch-26.15 drafts. Its chronological folds, feature equations, grids, seeds,
+optimizer settings, calibration policy, 2,000-replicate paired bootstrap, and
+material-usefulness gate remain fixed. Patch 26.16 and any other future temporal
+holdout remain outside this stage.
+
+The operational amendment adds a deterministic private timestamp/source adapter,
+a zero-fit preflight, privacy-safe external JSONL progress events, an exactly-once
+execution guard, expanded candidate-ablation intervals, and atomic aggregate
+publication. Observational timing and environment files are hashed and verified but
+excluded from the scientific deterministic bundle fingerprint. No row-level OOF
+prediction, match/player identity, raw path, or model coefficient is published.
+
+See [docs/stage3_4b_operational_refreeze.md](docs/stage3_4b_operational_refreeze.md)
+for the executable preflight and future publication contract. The operational
+amendment does not authorize fitting the real corpus; a future run must supply both
+`--publish` and `--authorize-real-fit` under separate authorization.
+
 ## Stage 2: controlled population sampling
 
 EUNE uses platform route `eun1` for League/Summoner endpoints and regional route

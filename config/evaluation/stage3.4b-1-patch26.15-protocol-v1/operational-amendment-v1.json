@@ -1,0 +1,149 @@
+{
+  "bootstrap_expansion": {
+    "comparison_direction": "candidate_minus_comparator; negative log-loss or Brier difference is improvement",
+    "comparison_pairs": [
+      {
+        "candidate": "shared_allied_synergy",
+        "comparator": "composition_with_side_intercept"
+      },
+      {
+        "candidate": "shared_lane_counter",
+        "comparator": "composition_with_side_intercept"
+      },
+      {
+        "candidate": "combined_shared_interactions",
+        "comparator": "composition_with_side_intercept"
+      },
+      {
+        "candidate": "combined_shared_interactions",
+        "comparator": "shared_allied_synergy"
+      },
+      {
+        "candidate": "combined_shared_interactions",
+        "comparator": "shared_lane_counter"
+      }
+    ],
+    "metrics": [
+      "log_loss",
+      "brier_score"
+    ],
+    "replicates": 2000,
+    "seed": 34201,
+    "strata": [
+      "platform",
+      "outer_block"
+    ],
+    "timing": "prospectively frozen before any real Stage 3.4B-1 fit"
+  },
+  "diagnostics": {
+    "contains_external_paths": false,
+    "contains_identifiers_labels_predictions_or_coefficients": false,
+    "location_policy": "unique JSONL outside repository, scientific inputs and scientific output",
+    "maximum_bytes": 2000000,
+    "maximum_events": 2000,
+    "required_events": [
+      "execution_started",
+      "source_preflight_completed",
+      "phase_started",
+      "phase_completed",
+      "predictive_training_operation_started",
+      "predictive_training_operation_completed",
+      "calibration_evaluation_started",
+      "calibration_evaluation_completed",
+      "bootstrap_started",
+      "bootstrap_completed",
+      "publication_started",
+      "publication_completed"
+    ],
+    "schema_version": "stage3.4b-1-diagnostics-v1"
+  },
+  "execution": {
+    "full_mode": "exactly one load-evaluate-publish invocation; no validation-only precursor",
+    "preflight_mode": "load, fingerprint and construct frozen folds with zero model fits and zero scientific writes",
+    "real_data_fit_authorized_by_this_amendment": false,
+    "retries": 0
+  },
+  "fit_reconciliation": {
+    "analytic_baseline_training_operations": 8,
+    "bootstrap_model_fits": 0,
+    "calibration_evaluations": 63,
+    "calibration_optimizer_fits_maximum": 63,
+    "failed_or_retried_fits_required": 0,
+    "predictive_optimizer_fits": 163,
+    "predictive_training_operations": 171,
+    "total_optimizer_invocations_maximum": 226
+  },
+  "frozen_baseline": {
+    "implementation_file_sha256_before_operational_changes": "f79dd1a91cda64ea6b2787fc6c26895e57357c6e2a6fed5d585d40e31c90ce22",
+    "repository_commit": "cc5dd3ab764cf69eff4488890bbcd361e220b8df",
+    "scientific_protocol_canonical_sha256": "e23a0c74517ea9a6700875c0a2ab8beb9e977cbdce9a1279ba4153beadae0c7f",
+    "scientific_protocol_file_sha256": "cb8c0b936d0632b9c472bed6a461b638a0f9425752ebcc6b9719642d55177979"
+  },
+  "immutability": {
+    "scientific_design_changed": false,
+    "scientific_protocol_file_must_remain_byte_identical": true,
+    "stage3_4a_artifacts_must_remain_unchanged": true
+  },
+  "operational_protocol_id": "stage3.4b-1-patch26.15-operational-amendment-v1",
+  "privacy": {
+    "aggregate_only_publication": true,
+    "external_paths_published": false,
+    "match_or_player_identifiers_published": false,
+    "oof_rows_ephemeral_only": true,
+    "pseudonymous_player_keys_published": false
+  },
+  "publication": {
+    "atomic_directory_replace": true,
+    "manifest_file": "bundle_manifest.json",
+    "observational_files": [
+      "execution_environment.json",
+      "timing_summary.json"
+    ],
+    "published_files": [
+      "bundle_manifest.json",
+      "development_report.md",
+      "development_results.json",
+      "execution_environment.json",
+      "final_model_summaries.json",
+      "fit_reconciliation.json",
+      "input_manifest.json",
+      "quality_report.json",
+      "timing_summary.json"
+    ],
+    "scientific_deterministic_files": [
+      "development_report.md",
+      "development_results.json",
+      "final_model_summaries.json",
+      "fit_reconciliation.json",
+      "input_manifest.json",
+      "quality_report.json"
+    ],
+    "existing_unequal_output_policy": "fail_closed",
+    "maximum_bundle_bytes": 10000000,
+    "results_directory_name": "development-v1"
+  },
+  "schema_version": "stage3.4b-1-operational-amendment-v1",
+  "source_adapter": {
+    "allowed_runtime_sources": [
+      "eune:external",
+      "eune:retained_private",
+      "euw:external",
+      "euw:retained_private"
+    ],
+    "expected_eligible_drafts": 9414,
+    "expected_platform_counts": {
+      "eun1": 4700,
+      "euw1": 4714
+    },
+    "expected_stage3_4a_combined_input_sha256": "e753718197ae5caeddce5f34430b1f68638b792f32ca76c53afb22e3ddd6b68d",
+    "stage3_1_join_file": "matches.jsonl",
+    "stage3_1_join_fields": [
+      "match_id",
+      "platform",
+      "game_creation"
+    ],
+    "stage3_1_lineage_policy": "use the Stage 3.1 directory and hashes declared by each verified Stage 3.3A metadata file",
+    "stage3_4a_protocol_file_sha256": "ac7b9f221b98a6e9b0c021d071642bb6ecc5706112d46d1432216e7ae0fe8a00"
+  },
+  "status": "prospectively_frozen_before_real_stage3_4b_1_execution"
+}

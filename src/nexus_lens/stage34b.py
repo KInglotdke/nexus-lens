@@ -8,6 +8,7 @@ import math
 import os
 import shutil
 import tempfile
+import time
 from collections import Counter, defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -121,6 +122,17 @@ class Stage34BEvaluation:
     final_candidate_models: dict[str, SharedInteractionModel]
 
 
+@dataclass(frozen=True)
+class _TrainingOperation:
+    number: int
+    started: float
+    phase: str
+    model: str
+    config_id: str | None
+    optimizer_fit: bool
+    fields: dict[str, Any]
+
+
 class _FitCounter:
     def __init__(self, callback: ProgressCallback | None) -> None:
         self.count = 0
@@ -128,30 +140,132 @@ class _FitCounter:
         self.analytic_operations = 0
         self.callback = callback
 
-    def record(
+    def start(
         self,
         *,
         phase: str,
         model: str,
         optimizer_fit: bool,
         config_id: str | None = None,
-    ) -> None:
+        **fields: Any,
+    ) -> _TrainingOperation:
         self.count += 1
         if optimizer_fit:
             self.optimizer_fits += 1
         else:
             self.analytic_operations += 1
+        operation = _TrainingOperation(
+            number=self.count,
+            started=time.perf_counter(),
+            phase=phase,
+            model=model,
+            config_id=config_id,
+            optimizer_fit=optimizer_fit,
+            fields=fields,
+        )
+        self._emit("predictive_training_operation_started", operation)
+        return operation
+
+    def complete(
+        self,
+        operation: _TrainingOperation,
+        *,
+        optimizer_iterations: int,
+        optimizer_status: str,
+        parameter_count: int,
+    ) -> None:
+        self._emit(
+            "predictive_training_operation_completed",
+            operation,
+            duration_seconds=time.perf_counter() - operation.started,
+            optimizer_iterations=optimizer_iterations,
+            optimizer_status=optimizer_status,
+            parameter_count=parameter_count,
+        )
+
+    def failed(self, operation: _TrainingOperation) -> None:
+        self._emit(
+            "predictive_training_operation_failed",
+            operation,
+            duration_seconds=time.perf_counter() - operation.started,
+            optimizer_status="failed_closed",
+        )
+
+    def _emit(
+        self, event: str, operation: _TrainingOperation, **fields: Any
+    ) -> None:
         if self.callback is not None:
             self.callback(
                 {
-                    "event": "predictive_training_operation_completed",
-                    "training_operation_number": self.count,
-                    "phase": phase,
-                    "model": model,
-                    "config_id": config_id,
-                    "optimizer_fit": optimizer_fit,
+                    "event": event,
+                    "training_operation_number": operation.number,
+                    "phase": operation.phase,
+                    "model": operation.model,
+                    "config_id": operation.config_id,
+                    "optimizer_fit": operation.optimizer_fit,
+                    **operation.fields,
+                    **fields,
                 }
             )
+
+
+class _CalibrationCounter:
+    def __init__(self, callback: ProgressCallback | None) -> None:
+        self.evaluations = 0
+        self.optimizer_fits = 0
+        self.analytic_evaluations = 0
+        self.callback = callback
+
+    def evaluate(
+        self,
+        probabilities: list[float],
+        outcomes: list[int],
+        *,
+        policy: str,
+        scope: str,
+    ) -> tuple[float, float | None, str | None]:
+        self.evaluations += 1
+        started = time.perf_counter()
+        self._emit(
+            "calibration_evaluation_started",
+            calibration_evaluation_number=self.evaluations,
+            policy=policy,
+            scope=scope,
+        )
+        try:
+            intercept, slope, reason, optimizer_fit, iterations, status = (
+                _calibration_intercept_slope(probabilities, outcomes)
+            )
+        except Exception:
+            self._emit(
+                "calibration_evaluation_failed",
+                calibration_evaluation_number=self.evaluations,
+                policy=policy,
+                scope=scope,
+                duration_seconds=time.perf_counter() - started,
+                optimizer_status="failed_closed",
+            )
+            raise
+        if optimizer_fit:
+            self.optimizer_fits += 1
+        else:
+            self.analytic_evaluations += 1
+        self._emit(
+            "calibration_evaluation_completed",
+            calibration_evaluation_number=self.evaluations,
+            policy=policy,
+            scope=scope,
+            duration_seconds=time.perf_counter() - started,
+            optimizer_fit=optimizer_fit,
+            optimizer_iterations=iterations,
+            optimizer_status=status,
+            parameter_count=2 if optimizer_fit else 1,
+        )
+        return intercept, slope, reason
+
+    def _emit(self, event: str, **fields: Any) -> None:
+        if self.callback is not None:
+            self.callback({"event": event, "phase": "calibration", **fields})
 
 
 def load_stage34b_protocol(
@@ -615,24 +729,42 @@ def select_shared_config(
         losses = []
         fold_rows = []
         for fold in inner_folds:
-            model = fit_shared_interaction_model(
-                tuple(row.draft for row in fold.training),
-                variant=variant,
-                config=config,
-                embedding_support_minimum=hyper[
-                    "embedding_support_minimum_training_matches"
-                ],
-                seed=hyper["seed"],
-                initialization_scope=f"{phase}|{fold.fold_id}",
-                maximum_iterations=hyper["maximum_iterations"],
-                tolerance=hyper["optimizer_tolerance"],
-            )
-            if fit_counter is not None:
-                fit_counter.record(
+            operation = (
+                fit_counter.start(
                     phase=phase,
                     model=variant,
                     config_id=config.config_id,
                     optimizer_fit=True,
+                    inner_fold=fold.fold_id,
+                    training_matches=len(fold.training),
+                )
+                if fit_counter is not None
+                else None
+            )
+            try:
+                model = fit_shared_interaction_model(
+                    tuple(row.draft for row in fold.training),
+                    variant=variant,
+                    config=config,
+                    embedding_support_minimum=hyper[
+                        "embedding_support_minimum_training_matches"
+                    ],
+                    seed=hyper["seed"],
+                    initialization_scope=f"{phase}|{fold.fold_id}",
+                    maximum_iterations=hyper["maximum_iterations"],
+                    tolerance=hyper["optimizer_tolerance"],
+                )
+            except Exception:
+                if fit_counter is not None and operation is not None:
+                    fit_counter.failed(operation)
+                raise
+            if fit_counter is not None:
+                assert operation is not None
+                fit_counter.complete(
+                    operation,
+                    optimizer_iterations=model.optimizer_iterations,
+                    optimizer_status=model.optimizer_status,
+                    parameter_count=_shared_parameter_count(model),
                 )
             fold_losses = [
                 _binary_log_loss(
@@ -647,6 +779,13 @@ def select_shared_config(
                     "training_matches": len(fold.training),
                     "validation_matches": len(fold.validation),
                     "mean_validation_log_loss": mean(fold_losses),
+                    "vocabulary_size": len(model.vocabulary.keys),
+                    "embedding_feature_count": len(
+                        model.embedding_feature_indexes
+                    ),
+                    "parameter_count": _shared_parameter_count(model),
+                    "optimizer_iterations": model.optimizer_iterations,
+                    "optimizer_status": model.optimizer_status,
                 }
             )
         results.append(
@@ -678,7 +817,53 @@ def paired_bootstrap_intervals(
     replicates: int,
     seed: int,
 ) -> dict[str, Any]:
+    pairs = tuple(
+        (candidate, baseline)
+        for candidate in candidates
+        for baseline in baselines
+    )
+    flat = paired_bootstrap_comparisons(
+        records, comparisons=pairs, replicates=replicates, seed=seed
+    )
+    return {
+        candidate: {
+            baseline: {
+                metric: {
+                    **values,
+                    "orientation": "candidate_minus_baseline",
+                }
+                for metric, values in flat[f"{candidate}_vs_{baseline}"][
+                    "metrics"
+                ].items()
+            }
+            for baseline in baselines
+        }
+        for candidate in candidates
+    }
+
+
+def paired_bootstrap_comparisons(
+    records: tuple[_PredictionRow, ...],
+    *,
+    comparisons: tuple[tuple[str, str], ...],
+    replicates: int,
+    seed: int,
+) -> dict[str, Any]:
+    if not comparisons:
+        return {}
     _validate_prediction_records(records)
+    if (
+        len(comparisons) != len(set(comparisons))
+        or any(
+            candidate not in ALL_POLICIES
+            or comparator not in ALL_POLICIES
+            or candidate == comparator
+            for candidate, comparator in comparisons
+        )
+    ):
+        raise Stage3ValidationError(
+            "stage34b_bootstrap_comparison", "bootstrap comparison set is invalid"
+        )
     strata: dict[tuple[str, str], list[int]] = defaultdict(list)
     for index, row in enumerate(records):
         strata[(row.platform, row.outer_block)].append(index)
@@ -686,53 +871,61 @@ def paired_bootstrap_intervals(
         raise Stage3ValidationError(
             "stage34b_bootstrap_replicates", "bootstrap replicates must be positive"
         )
-    comparisons = tuple(
-        (candidate, baseline, metric)
-        for candidate in candidates
-        for baseline in baselines
+    metric_comparisons = tuple(
+        (candidate, comparator, metric)
+        for candidate, comparator in comparisons
         for metric in ("log_loss", "brier_score")
     )
     differences = np.asarray(
         [
             [
                 _metric_loss(metric, row.probabilities[candidate], row.outcome)
-                - _metric_loss(metric, row.probabilities[baseline], row.outcome)
+                - _metric_loss(metric, row.probabilities[comparator], row.outcome)
                 for row in records
             ]
-            for candidate, baseline, metric in comparisons
+            for candidate, comparator, metric in metric_comparisons
         ],
         dtype=np.float64,
     )
     rng = np.random.default_rng(seed)
-    replicate_sums = np.zeros((len(comparisons), replicates), dtype=np.float64)
+    replicate_sums = np.zeros(
+        (len(metric_comparisons), replicates), dtype=np.float64
+    )
     for _, values in sorted(strata.items()):
         indexes = np.asarray(values, dtype=np.int64)
         probabilities = np.full(len(indexes), 1 / len(indexes), dtype=np.float64)
         counts = rng.multinomial(len(indexes), probabilities, size=replicates)
         replicate_sums += differences[:, indexes] @ counts.T
     samples = replicate_sums / len(records)
-    sample_index = {comparison: index for index, comparison in enumerate(comparisons)}
+    sample_index = {
+        comparison: index for index, comparison in enumerate(metric_comparisons)
+    }
     output: dict[str, Any] = {}
-    for candidate in candidates:
-        output[candidate] = {}
-        for baseline in baselines:
-            output[candidate][baseline] = {}
-            for metric in ("log_loss", "brier_score"):
-                point_values = [
-                    _metric_loss(metric, row.probabilities[candidate], row.outcome)
-                    - _metric_loss(metric, row.probabilities[baseline], row.outcome)
-                    for row in records
-                ]
-                values = samples[sample_index[(candidate, baseline, metric)]].tolist()
-                output[candidate][baseline][metric] = {
-                    "orientation": "candidate_minus_baseline",
-                    "point_difference": mean(point_values),
-                    "lower_0_025": _quantile(values, 0.025),
-                    "upper_0_975": _quantile(values, 0.975),
-                    "replicates": replicates,
-                    "seed": seed,
-                    "strata": ["platform", "outer_block"],
-                }
+    for candidate, comparator in comparisons:
+        key = f"{candidate}_vs_{comparator}"
+        output[key] = {
+            "candidate": candidate,
+            "comparator": comparator,
+            "metrics": {},
+        }
+        for metric in ("log_loss", "brier_score"):
+            point_values = [
+                _metric_loss(metric, row.probabilities[candidate], row.outcome)
+                - _metric_loss(metric, row.probabilities[comparator], row.outcome)
+                for row in records
+            ]
+            values = samples[
+                sample_index[(candidate, comparator, metric)]
+            ].tolist()
+            output[key]["metrics"][metric] = {
+                "orientation": "candidate_minus_comparator",
+                "point_difference": mean(point_values),
+                "lower_0_025": _quantile(values, 0.025),
+                "upper_0_975": _quantile(values, 0.975),
+                "replicates": replicates,
+                "seed": seed,
+                "strata": ["platform", "outer_block"],
+            }
     return output
 
 
@@ -742,9 +935,12 @@ def evaluate_stage34b(
     *,
     enforce_frozen_counts: bool,
     progress_callback: ProgressCallback | None = None,
+    additional_paired_comparisons: tuple[tuple[str, str], ...] = (),
 ) -> Stage34BEvaluation:
     """Execute Stage 3.4B-1; callers must enforce authorization for real data."""
 
+    evaluation_started = time.perf_counter()
+    _emit_progress(progress_callback, "phase_started", phase="evaluation")
     validate_stage34b_protocol(protocol)
     outer_folds = construct_outer_folds(
         rows, protocol, enforce_frozen_counts=enforce_frozen_counts
@@ -753,9 +949,17 @@ def evaluate_stage34b(
     minimum = protocol["validation"]["minimum_preceding_training"]
     grids = _candidate_grids(protocol)
     fit_counter = _FitCounter(progress_callback)
+    calibration_counter = _CalibrationCounter(progress_callback)
     prediction_rows: list[_PredictionRow] = []
     selections: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for outer in outer_folds:
+        outer_started = time.perf_counter()
+        _emit_progress(
+            progress_callback,
+            "phase_started",
+            phase="outer_evaluation",
+            outer_block=outer.fold_id,
+        )
         inner = construct_inner_folds(
             outer.training,
             outer.cutoff,
@@ -765,32 +969,68 @@ def evaluate_stage34b(
             minimum_hours=minimum["hours"],
         )
         training_drafts = tuple(row.draft for row in outer.training)
-        blue_rate = mean(row.outcome for row in training_drafts)
-        fit_counter.record(
+        operation = fit_counter.start(
             phase="outer_baseline",
             model="training_fold_blue_win_rate_intercept",
             optimizer_fit=False,
+            outer_block=outer.fold_id,
         )
-        role_rates = _fit_role_rate_baseline(
-            training_drafts,
-            minimum_support=hyper["rate_baseline_minimum_training_matches"],
+        try:
+            blue_rate = mean(row.outcome for row in training_drafts)
+        except Exception:
+            fit_counter.failed(operation)
+            raise
+        fit_counter.complete(
+            operation,
+            optimizer_iterations=0,
+            optimizer_status="analytic",
+            parameter_count=1,
         )
-        fit_counter.record(
+        operation = fit_counter.start(
             phase="outer_baseline",
             model="fold_local_champion_role_rate_minimum_support_10",
             optimizer_fit=False,
+            outer_block=outer.fold_id,
+        )
+        try:
+            role_rates = _fit_role_rate_baseline(
+                training_drafts,
+                minimum_support=hyper["rate_baseline_minimum_training_matches"],
+            )
+        except Exception:
+            fit_counter.failed(operation)
+            raise
+        fit_counter.complete(
+            operation,
+            optimizer_iterations=0,
+            optimizer_status="analytic",
+            parameter_count=len(role_rates),
         )
         stage_a = {}
         for variant in MODEL_VARIANTS:
-            model = fit_composition_model(
-                training_drafts,
-                variant=variant,
+            operation = fit_counter.start(
+                phase="outer_baseline",
+                model=variant,
+                optimizer_fit=True,
+                outer_block=outer.fold_id,
                 l2_strength=0.1,
-                max_iterations=hyper["maximum_iterations"],
-                tolerance=hyper["optimizer_tolerance"],
             )
-            fit_counter.record(
-                phase="outer_baseline", model=variant, optimizer_fit=True
+            try:
+                model = fit_composition_model(
+                    training_drafts,
+                    variant=variant,
+                    l2_strength=0.1,
+                    max_iterations=hyper["maximum_iterations"],
+                    tolerance=hyper["optimizer_tolerance"],
+                )
+            except Exception:
+                fit_counter.failed(operation)
+                raise
+            fit_counter.complete(
+                operation,
+                optimizer_iterations=model.optimizer_iterations,
+                optimizer_status=model.optimizer_status,
+                parameter_count=len(model.coefficients),
             )
             stage_a[variant] = model
         candidates = {}
@@ -803,23 +1043,34 @@ def evaluate_stage34b(
                 fit_counter=fit_counter,
                 phase=f"{outer.fold_id}_inner_selection",
             )
-            model = fit_shared_interaction_model(
-                training_drafts,
-                variant=variant,
-                config=selected,
-                embedding_support_minimum=hyper[
-                    "embedding_support_minimum_training_matches"
-                ],
-                seed=hyper["seed"],
-                initialization_scope=f"{outer.fold_id}|outer_fit",
-                maximum_iterations=hyper["maximum_iterations"],
-                tolerance=hyper["optimizer_tolerance"],
-            )
-            fit_counter.record(
+            operation = fit_counter.start(
                 phase="outer_candidate",
                 model=variant,
                 config_id=selected.config_id,
                 optimizer_fit=True,
+                outer_block=outer.fold_id,
+            )
+            try:
+                model = fit_shared_interaction_model(
+                    training_drafts,
+                    variant=variant,
+                    config=selected,
+                    embedding_support_minimum=hyper[
+                        "embedding_support_minimum_training_matches"
+                    ],
+                    seed=hyper["seed"],
+                    initialization_scope=f"{outer.fold_id}|outer_fit",
+                    maximum_iterations=hyper["maximum_iterations"],
+                    tolerance=hyper["optimizer_tolerance"],
+                )
+            except Exception:
+                fit_counter.failed(operation)
+                raise
+            fit_counter.complete(
+                operation,
+                optimizer_iterations=model.optimizer_iterations,
+                optimizer_status=model.optimizer_status,
+                parameter_count=_shared_parameter_count(model),
             )
             candidates[variant] = model
             selections[variant].append(
@@ -858,15 +1109,51 @@ def evaluate_stage34b(
                     probabilities=probabilities,
                 )
             )
+        _emit_progress(
+            progress_callback,
+            "phase_completed",
+            phase="outer_evaluation",
+            outer_block=outer.fold_id,
+            duration_seconds=time.perf_counter() - outer_started,
+        )
     ephemeral = tuple(prediction_rows)
     _validate_prediction_records(ephemeral)
-    metrics = _aggregate_metrics(ephemeral, protocol["metrics"]["calibration_bins"])
+    metrics_started = time.perf_counter()
+    _emit_progress(progress_callback, "phase_started", phase="metrics")
+    metrics = _aggregate_metrics(
+        ephemeral,
+        protocol["metrics"]["calibration_bins"],
+        calibration_counter=calibration_counter,
+    )
+    _emit_progress(
+        progress_callback,
+        "phase_completed",
+        phase="metrics",
+        duration_seconds=time.perf_counter() - metrics_started,
+    )
+    bootstrap_started = time.perf_counter()
+    _emit_progress(progress_callback, "bootstrap_started", phase="bootstrap")
     bootstrap = paired_bootstrap_intervals(
         ephemeral,
         candidates=MODEL_VARIANTS_B,
         baselines=BASELINES,
         replicates=protocol["metrics"]["bootstrap"]["replicates"],
         seed=protocol["metrics"]["bootstrap"]["seed"],
+    )
+    ablation_bootstrap = paired_bootstrap_comparisons(
+        ephemeral,
+        comparisons=additional_paired_comparisons,
+        replicates=protocol["metrics"]["bootstrap"]["replicates"],
+        seed=protocol["metrics"]["bootstrap"]["seed"],
+    )
+    _emit_progress(
+        progress_callback,
+        "bootstrap_completed",
+        phase="bootstrap",
+        duration_seconds=time.perf_counter() - bootstrap_started,
+        model_fits=0,
+        baseline_comparisons=len(MODEL_VARIANTS_B) * len(BASELINES),
+        ablation_comparisons=len(additional_paired_comparisons),
     )
     coverage = {
         variant: {
@@ -896,6 +1183,8 @@ def evaluate_stage34b(
     final_models = {}
     final_selection = {}
     drafts = tuple(row.draft for row in rows)
+    final_started = time.perf_counter()
+    _emit_progress(progress_callback, "phase_started", phase="final_development")
     for variant in MODEL_VARIANTS_B:
         selected, candidate_rows = select_shared_config(
             variant=variant,
@@ -905,29 +1194,45 @@ def evaluate_stage34b(
             fit_counter=fit_counter,
             phase="final_inner_selection",
         )
-        model = fit_shared_interaction_model(
-            drafts,
-            variant=variant,
-            config=selected,
-            embedding_support_minimum=hyper[
-                "embedding_support_minimum_training_matches"
-            ],
-            seed=hyper["seed"],
-            initialization_scope="final_all_development",
-            maximum_iterations=hyper["maximum_iterations"],
-            tolerance=hyper["optimizer_tolerance"],
-        )
-        fit_counter.record(
+        operation = fit_counter.start(
             phase="final_candidate",
             model=variant,
             config_id=selected.config_id,
             optimizer_fit=True,
+        )
+        try:
+            model = fit_shared_interaction_model(
+                drafts,
+                variant=variant,
+                config=selected,
+                embedding_support_minimum=hyper[
+                    "embedding_support_minimum_training_matches"
+                ],
+                seed=hyper["seed"],
+                initialization_scope="final_all_development",
+                maximum_iterations=hyper["maximum_iterations"],
+                tolerance=hyper["optimizer_tolerance"],
+            )
+        except Exception:
+            fit_counter.failed(operation)
+            raise
+        fit_counter.complete(
+            operation,
+            optimizer_iterations=model.optimizer_iterations,
+            optimizer_status=model.optimizer_status,
+            parameter_count=_shared_parameter_count(model),
         )
         final_models[variant] = model
         final_selection[variant] = {
             "selected_config_id": selected.config_id,
             "candidates": candidate_rows,
         }
+    _emit_progress(
+        progress_callback,
+        "phase_completed",
+        phase="final_development",
+        duration_seconds=time.perf_counter() - final_started,
+    )
     expected_accounting = expected_fit_accounting(protocol)
     expected = expected_accounting["expected_predictive_training_operations"]
     if (
@@ -939,6 +1244,16 @@ def evaluate_stage34b(
     ):
         raise Stage3ValidationError(
             "stage34b_fit_count_conflict", "Stage 3.4B fit count differs"
+        )
+    if (
+        calibration_counter.evaluations
+        != expected_accounting["calibration_metric_evaluations"]
+        or calibration_counter.optimizer_fits
+        > expected_accounting["calibration_metric_optimizer_fits_upper_bound"]
+    ):
+        raise Stage3ValidationError(
+            "stage34b_calibration_count_conflict",
+            "Stage 3.4B calibration count differs",
         )
     artifact = {
         "schema_version": RESULT_SCHEMA_VERSION,
@@ -952,6 +1267,16 @@ def evaluate_stage34b(
             "observed_analytic_baseline_training_operations": (
                 fit_counter.analytic_operations
             ),
+            "observed_calibration_evaluations": calibration_counter.evaluations,
+            "observed_calibration_optimizer_fits": (
+                calibration_counter.optimizer_fits
+            ),
+            "observed_calibration_analytic_evaluations": (
+                calibration_counter.analytic_evaluations
+            ),
+            "observed_bootstrap_model_fits": 0,
+            "observed_failed_fits": 0,
+            "observed_retried_fits": 0,
         },
         "outer_fold_counts": {
             fold.fold_id: {
@@ -964,6 +1289,7 @@ def evaluate_stage34b(
         "final_selection": final_selection,
         "metrics": metrics,
         "paired_bootstrap_intervals": bootstrap,
+        "paired_ablation_intervals": ablation_bootstrap,
         "coverage_reconciliation": coverage,
         "material_usefulness_gate": protocol["material_usefulness_gate"],
         "material_usefulness_evaluation": gate_evaluation,
@@ -980,6 +1306,12 @@ def evaluate_stage34b(
         },
     }
     _reject_nonfinite(artifact)
+    _emit_progress(
+        progress_callback,
+        "phase_completed",
+        phase="evaluation",
+        duration_seconds=time.perf_counter() - evaluation_started,
+    )
     return Stage34BEvaluation(
         artifact=artifact, final_candidate_models=final_models
     )
@@ -1073,8 +1405,105 @@ def evaluate_material_usefulness_gate(
             )
             >= gate["chronological_blocks_with_improvement_minimum"],
         }
+        observed = {
+            "log_loss_improvement_vs_blue_intercept": (
+                metrics[blue]["overall"]["log_loss"] - overall["log_loss"]
+            ),
+            "log_loss_improvement_vs_composition": (
+                metrics[composition]["overall"]["log_loss"]
+                - overall["log_loss"]
+            ),
+            "paired_log_loss_upper_vs_blue_below_zero": paired_intervals[
+                candidate
+            ][blue]["log_loss"]["upper_0_975"],
+            "paired_log_loss_upper_vs_composition_below_zero": paired_intervals[
+                candidate
+            ][composition]["log_loss"]["upper_0_975"],
+            "brier_improvement_vs_blue_intercept": (
+                metrics[blue]["overall"]["brier_score"]
+                - overall["brier_score"]
+            ),
+            "brier_improvement_vs_composition": (
+                metrics[composition]["overall"]["brier_score"]
+                - overall["brier_score"]
+            ),
+            "each_platform_improves_vs_composition": {
+                platform: metrics[composition][platform]["log_loss"]
+                - candidate_metrics[platform]["log_loss"]
+                for platform in ("eun1", "euw1")
+            },
+            "no_platform_worse_than_blue_intercept": {
+                platform: candidate_metrics[platform]["log_loss"]
+                - metrics[blue][platform]["log_loss"]
+                for platform in ("eun1", "euw1")
+            },
+            "ece": overall["expected_calibration_error"],
+            "calibration_slope": overall["calibration_slope"],
+            "calibration_intercept": abs(overall["calibration_intercept"]),
+            "coverage": coverage[candidate]["overall"],
+            "role_coverage": coverage[candidate][
+                "maximum_role_coverage_drop_vs_composition"
+            ],
+            "chronological_direction_repeats": sum(
+                candidate_metrics[block]["log_loss"]
+                < metrics[composition][block]["log_loss"]
+                for block in blocks
+            ),
+        }
+        required = {
+            "log_loss_improvement_vs_blue_intercept": (
+                f">={gate['log_loss_improvement_vs_blue_intercept_minimum']}"
+            ),
+            "log_loss_improvement_vs_composition": (
+                f">={gate['log_loss_improvement_vs_composition_minimum']}"
+            ),
+            "paired_log_loss_upper_vs_blue_below_zero": "<0",
+            "paired_log_loss_upper_vs_composition_below_zero": "<0",
+            "brier_improvement_vs_blue_intercept": (
+                f">={gate['overall_brier_improvement_vs_both_baselines_minimum']}"
+            ),
+            "brier_improvement_vs_composition": (
+                f">={gate['overall_brier_improvement_vs_both_baselines_minimum']}"
+            ),
+            "each_platform_improves_vs_composition": (
+                ">="
+                f"{gate['each_platform_log_loss_improvement_vs_composition_minimum']}"
+                " for each platform"
+            ),
+            "no_platform_worse_than_blue_intercept": "<=0 for each platform",
+            "ece": f"<={gate['ece_maximum']}",
+            "calibration_slope": (
+                f"{gate['calibration_slope_minimum']}.."
+                f"{gate['calibration_slope_maximum']}"
+            ),
+            "calibration_intercept": (
+                f"<={gate['calibration_intercept_absolute_maximum']} absolute"
+            ),
+            "coverage": f">={gate['coverage_minimum']}",
+            "role_coverage": f"<={gate['role_coverage_maximum_drop']} drop",
+            "chronological_direction_repeats": (
+                f">={gate['chronological_blocks_with_improvement_minimum']} blocks"
+            ),
+        }
+        artifact_fields = {
+            name: (
+                "metrics and paired_bootstrap_intervals"
+                if "paired" in name
+                else "metrics and coverage_reconciliation"
+            )
+            for name in checks
+        }
         output[candidate] = {
             "checks": checks,
+            "criteria": {
+                name: {
+                    "required": required[name],
+                    "observed": observed[name],
+                    "passed": checks[name],
+                    "supporting_aggregate_artifact_field": artifact_fields[name],
+                }
+                for name in checks
+            },
             "passes_all": all(checks.values()),
             "interpretation": "patch26.15_rolling_origin_development_gate_only",
         }
@@ -1443,7 +1872,10 @@ def _predict_role_rate(
 
 
 def _aggregate_metrics(
-    records: tuple[_PredictionRow, ...], calibration_bins: int
+    records: tuple[_PredictionRow, ...],
+    calibration_bins: int,
+    *,
+    calibration_counter: _CalibrationCounter | None = None,
 ) -> dict[str, Any]:
     output = {}
     scopes: dict[str, list[_PredictionRow]] = {
@@ -1454,19 +1886,34 @@ def _aggregate_metrics(
     for block in sorted({row.outer_block for row in records}):
         scopes[block] = [row for row in records if row.outer_block == block]
     for policy in ALL_POLICIES:
-        output[policy] = {
-            scope: _metric_summary(rows, policy, calibration_bins)
-            for scope, rows in scopes.items()
-        }
+        output[policy] = {}
+        for scope, rows in scopes.items():
+            output[policy][scope] = _metric_summary(
+                rows,
+                policy,
+                calibration_bins,
+                scope=scope,
+                calibration_counter=calibration_counter,
+            )
     return output
 
 
 def _metric_summary(
-    rows: list[_PredictionRow], policy: str, calibration_bins: int
+    rows: list[_PredictionRow],
+    policy: str,
+    calibration_bins: int,
+    *,
+    scope: str,
+    calibration_counter: _CalibrationCounter | None,
 ) -> dict[str, Any]:
     probabilities = [row.probabilities[policy] for row in rows]
     outcomes = [row.outcome for row in rows]
-    calibration = _calibration_intercept_slope(probabilities, outcomes)
+    if calibration_counter is None:
+        calibration = _calibration_intercept_slope(probabilities, outcomes)[:3]
+    else:
+        calibration = calibration_counter.evaluate(
+            probabilities, outcomes, policy=policy, scope=scope
+        )
     return {
         "matches": len(rows),
         "log_loss": mean(
@@ -1493,11 +1940,18 @@ def _metric_summary(
 
 def _calibration_intercept_slope(
     probabilities: list[float], outcomes: list[int]
-) -> tuple[float, float | None, str | None]:
+) -> tuple[float, float | None, str | None, bool, int, str]:
     logits = np.asarray([_logit(value) for value in probabilities])
     targets = np.asarray(outcomes, dtype=np.float64)
     if np.ptp(logits) <= 1e-15:
-        return _logit(float(targets.mean())), None, "constant_prediction_logit"
+        return (
+            _logit(float(targets.mean())),
+            None,
+            "constant_prediction_logit",
+            False,
+            0,
+            "analytic_constant_logit",
+        )
 
     def objective(values: np.ndarray) -> tuple[float, np.ndarray]:
         scores = values[0] + values[1] * logits
@@ -1517,7 +1971,14 @@ def _calibration_intercept_slope(
         raise Stage3ValidationError(
             "stage34b_calibration_failure", "calibration metric regression failed"
         )
-    return float(result.x[0]), float(result.x[1]), None
+    return (
+        float(result.x[0]),
+        float(result.x[1]),
+        None,
+        True,
+        int(result.nit),
+        "converged",
+    )
 
 
 def _ece(probabilities: list[float], outcomes: list[int], bins: int) -> float:
@@ -1697,6 +2158,25 @@ def _selection_tie_key(config: SharedModelConfig) -> tuple[Any, ...]:
         config.synergy_dimension + config.counter_dimension,
         config.config_id,
     )
+
+
+def _shared_parameter_count(model: SharedInteractionModel) -> int:
+    return 1 + len(model.composition_coefficients) + sum(
+        len(row)
+        for matrix in (
+            model.synergy_embeddings,
+            model.counter_attack_embeddings,
+            model.counter_defense_embeddings,
+        )
+        for row in matrix
+    )
+
+
+def _emit_progress(
+    callback: ProgressCallback | None, event: str, **fields: Any
+) -> None:
+    if callback is not None:
+        callback({"event": event, **fields})
 
 
 def _initialization_seed(
