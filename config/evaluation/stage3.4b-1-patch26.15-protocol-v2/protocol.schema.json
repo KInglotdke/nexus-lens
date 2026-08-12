@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nexus-lens.local/schemas/stage3.4b-1-protocol-v2.json",
+  "additionalProperties": false,
+  "properties": {
+    "candidate_models": {"type": "object"},
+    "capacity_estimate": {"type": "object"},
+    "data_scope": {"type": "object"},
+    "execution_budget": {"type": "object"},
+    "future_holdout_policy": {"type": "string"},
+    "hyperparameter_policy": {"type": "object"},
+    "material_usefulness_gate": {"type": "object"},
+    "metrics": {"type": "object"},
+    "models": {"type": "object"},
+    "privacy": {"type": "object"},
+    "protocol_id": {"const": "stage3.4b-1-patch26.15-protocol-v2"},
+    "schema_version": {"const": "stage3.4b-1-protocol-v2"},
+    "status": {"const": "operationally_refrozen_after_zero_fit_elapsed_time_guard_removal"},
+    "target": {"type": "object"},
+    "validation": {"type": "object"}
+  },
+  "required": [
+    "candidate_models",
+    "capacity_estimate",
+    "data_scope",
+    "execution_budget",
+    "future_holdout_policy",
+    "hyperparameter_policy",
+    "material_usefulness_gate",
+    "metrics",
+    "models",
+    "privacy",
+    "protocol_id",
+    "schema_version",
+    "status",
+    "target",
+    "validation"
+  ],
+  "title": "Nexus Lens Stage 3.4B-1 prospective protocol",
+  "type": "object"
+}

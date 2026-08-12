@@ -1,9 +1,11 @@
 # Stage 3.4B-1 execution and publication plan
 
-This plan is frozen before any Stage 3.4B-1 model is fitted to the real patch-26.15
-development corpus. The versioned operational contract is
-`operational-amendment-v1.json` beside the scientific protocol. Executing the full
-experiment still requires separate explicit authorization and the CLI's explicit
+This plan is operationally refrozen after the first authorized invocation stopped
+before any fit. The current versioned contracts are in
+`config/evaluation/stage3.4b-1-patch26.15-protocol-v2/`, with
+`operational-amendment-v2.json` beside the scientific protocol. The unsupported
+48-hour elapsed-time guard was removed without changing fold boundaries. Executing
+the full experiment still requires explicit authorization and the CLI's
 `--authorize-real-fit` guard.
 
 ## Preflight
@@ -14,8 +16,8 @@ experiment still requires separate explicit authorization and the CLI's explicit
    ```powershell
    $env:PYTHONPATH='src'
    .\.venv\Scripts\python.exe scripts\validate_stage34b_protocol.py `
-     --protocol config/evaluation/stage3.4b-1-patch26.15-protocol-v1/protocol.json `
-     --schema config/evaluation/stage3.4b-1-patch26.15-protocol-v1/protocol.schema.json
+     --protocol config/evaluation/stage3.4b-1-patch26.15-protocol-v2/protocol.json `
+     --schema config/evaluation/stage3.4b-1-patch26.15-protocol-v2/protocol.schema.json
    ```
 
 3. Load only the four already sealed patch-26.15 Stage 3.3A components used by the

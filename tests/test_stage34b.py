@@ -37,9 +37,7 @@ from nexus_lens.stage34b import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-PROTOCOL_DIRECTORY = (
-    ROOT / "config/evaluation/stage3.4b-1-patch26.15-protocol-v1"
-)
+PROTOCOL_DIRECTORY = ROOT / "config/evaluation/stage3.4b-1-patch26.15-protocol-v2"
 PROTOCOL_PATH = PROTOCOL_DIRECTORY / "protocol.json"
 SCHEMA_PATH = PROTOCOL_DIRECTORY / "protocol.schema.json"
 
@@ -49,6 +47,11 @@ def test_frozen_protocol_schema_language_and_fit_accounting() -> None:
 
     assert "26.16" not in json.dumps(protocol, sort_keys=True)
     assert "future sealed temporal holdout" in protocol["future_holdout_policy"]
+    assert protocol["validation"]["minimum_training_support"] == {
+        "drafts": 800,
+        "per_platform_drafts": 300,
+    }
+    assert "minimum_preceding_training" not in protocol["validation"]
     assert expected_fit_accounting(protocol) == protocol["execution_budget"]
     assert protocol["execution_budget"] == {
         "analytic_baseline_training_operations": 8,
@@ -98,20 +101,17 @@ def test_chronological_folds_are_deterministic_strict_and_nonoverlapping() -> No
 
 def test_inner_selection_never_contains_outer_test_observation() -> None:
     protocol = _test_protocol()
-    outer = construct_outer_folds(
-        _timed_rows(), protocol, enforce_frozen_counts=False
-    )[0]
+    outer = construct_outer_folds(_timed_rows(), protocol, enforce_frozen_counts=False)[
+        0
+    ]
     inner = construct_inner_folds(
         outer.training,
         outer.cutoff,
         fold_count=3,
         minimum_training_drafts=1,
         minimum_per_platform=1,
-        minimum_hours=0,
     )
-    outer_test = {
-        (row.draft.platform, row.draft.match_id) for row in outer.validation
-    }
+    outer_test = {(row.draft.platform, row.draft.match_id) for row in outer.validation}
     inner_rows = {
         (row.draft.platform, row.draft.match_id)
         for fold in inner
@@ -124,6 +124,91 @@ def test_inner_selection_never_contains_outer_test_observation() -> None:
         < min(row.game_creation for row in fold.validation)
         for fold in inner
     )
+
+
+def test_inner_fold_accepts_observation_supported_37_52_hour_training_span() -> None:
+    cutoff = _utc(2026, 8, 3)
+    earliest = datetime(2026, 7, 29, 10, 28, 34, 35_000, tzinfo=UTC)
+    rows = []
+    for index, (platform, outcome) in enumerate(
+        (("eun1", 0), ("eun1", 1), ("euw1", 0), ("euw1", 1))
+    ):
+        rows.append(
+            TimedDraft(
+                _draft(f"initial-{index}", platform=platform, outcome=outcome),
+                earliest + timedelta(hours=index),
+            )
+        )
+    for day in range(3):
+        validation_start = _utc(2026, 7, 31) + timedelta(days=day)
+        for index, (platform, outcome) in enumerate(
+            (("eun1", 0), ("eun1", 1), ("euw1", 0), ("euw1", 1))
+        ):
+            rows.append(
+                TimedDraft(
+                    _draft(
+                        f"validation-{day}-{index}",
+                        platform=platform,
+                        outcome=outcome,
+                    ),
+                    validation_start + timedelta(hours=index + 1),
+                )
+            )
+
+    folds = construct_inner_folds(
+        tuple(rows),
+        cutoff,
+        fold_count=3,
+        minimum_training_drafts=4,
+        minimum_per_platform=2,
+    )
+
+    first_span = folds[0].cutoff - min(row.game_creation for row in folds[0].training)
+    assert first_span.total_seconds() / 3600 == pytest.approx(37.5238791667)
+    assert len(folds) == 3
+
+    with pytest.raises(Stage3ValidationError, match="training count is too small"):
+        construct_inner_folds(
+            tuple(rows),
+            cutoff,
+            fold_count=3,
+            minimum_training_drafts=5,
+            minimum_per_platform=2,
+        )
+
+    unsupported = tuple(
+        replace(row, draft=replace(row.draft, outcome=0))
+        if row.game_creation < _utc(2026, 7, 31)
+        else row
+        for row in rows
+    )
+    with pytest.raises(Stage3ValidationError, match="both outcome classes"):
+        construct_inner_folds(
+            unsupported,
+            cutoff,
+            fold_count=3,
+            minimum_training_drafts=4,
+            minimum_per_platform=2,
+        )
+
+    with pytest.raises(Stage3ValidationError, match="does not precede validation"):
+        stage34b._validate_chronological_fold(
+            (
+                replace(
+                    rows[0],
+                    game_creation=datetime(2026, 7, 31, 2, tzinfo=UTC),
+                ),
+            ),
+            (
+                replace(
+                    rows[1],
+                    game_creation=datetime(2026, 7, 31, 1, tzinfo=UTC),
+                ),
+            ),
+            datetime(2026, 7, 31, 3, tzinfo=UTC),
+            minimum_drafts=1,
+            minimum_per_platform=0,
+        )
 
 
 def test_fold_local_vocabulary_rates_and_unseen_features() -> None:
@@ -194,9 +279,7 @@ def test_team_swap_negates_draft_terms_around_side_intercept(
     )
 
     score = stage34b._logit(predict_shared_probability(model, draft))
-    swapped = stage34b._logit(
-        predict_shared_probability(model, swap_teams(draft))
-    )
+    swapped = stage34b._logit(predict_shared_probability(model, swap_teams(draft)))
     assert score + swapped == pytest.approx(2 * model.intercept, abs=1e-12)
 
 
@@ -276,7 +359,6 @@ def test_selection_and_tie_break_are_deterministic() -> None:
         fold_count=3,
         minimum_training_drafts=1,
         minimum_per_platform=1,
-        minimum_hours=0,
     )
     configs = (
         SharedModelConfig("z-config", 0.1, 0.0, 0, 0),
@@ -312,13 +394,16 @@ def test_selection_and_tie_break_are_deterministic() -> None:
     assert counter.count == len(configs) * len(folds)
     assert counter.optimizer_fits == counter.count
     assert counter.analytic_operations == 0
-    assert len(
-        [
-            event
-            for event in events
-            if event["event"] == "predictive_training_operation_completed"
-        ]
-    ) == counter.count
+    assert (
+        len(
+            [
+                event
+                for event in events
+                if event["event"] == "predictive_training_operation_completed"
+            ]
+        )
+        == counter.count
+    )
     assert all(
         event.get("optimizer_status") == "converged"
         for event in events
@@ -476,9 +561,9 @@ def test_material_gate_is_evaluated_from_same_fold_aggregates() -> None:
     )
     assert all(row["passes_all"] for row in result.values())
 
-    metrics[stage34b.MODEL_VARIANTS_B[0]]["overall"][
-        "expected_calibration_error"
-    ] = 0.03
+    metrics[stage34b.MODEL_VARIANTS_B[0]]["overall"]["expected_calibration_error"] = (
+        0.03
+    )
     result = evaluate_material_usefulness_gate(
         metrics=metrics,
         paired_intervals=intervals,
@@ -492,9 +577,8 @@ def test_material_gate_is_evaluated_from_same_fold_aggregates() -> None:
 def _test_protocol() -> dict:
     protocol = load_stage34b_protocol(PROTOCOL_PATH, schema_path=SCHEMA_PATH)
     protocol = copy.deepcopy(protocol)
-    protocol["validation"]["minimum_preceding_training"] = {
+    protocol["validation"]["minimum_training_support"] = {
         "drafts": 1,
-        "hours": 0,
         "per_platform_drafts": 1,
     }
     protocol["hyperparameter_policy"].update(

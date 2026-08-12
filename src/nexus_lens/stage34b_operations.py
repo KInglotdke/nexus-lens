@@ -32,17 +32,19 @@ from nexus_lens.stage34b import (
     PROTOCOL_SHA256,
     Stage34BEvaluation,
     TimedDraft,
+    construct_inner_folds,
     construct_outer_folds,
+    expected_fit_accounting,
     validate_stage34b_artifact,
 )
 
-OPERATIONAL_SCHEMA_VERSION = "stage3.4b-1-operational-amendment-v1"
-OPERATIONAL_PROTOCOL_ID = "stage3.4b-1-patch26.15-operational-amendment-v1"
+OPERATIONAL_SCHEMA_VERSION = "stage3.4b-1-operational-amendment-v2"
+OPERATIONAL_PROTOCOL_ID = "stage3.4b-1-patch26.15-operational-amendment-v2"
 OPERATIONAL_AMENDMENT_SHA256 = (
-    "88586a85aa81dfe292d8a8b8bb5476599752069bc7de20c1aaf956cc4b95e69d"
+    "9c92bf749e840591d56bef4c8f9551205bd3af3e232dfdf4c92aa20f80347055"
 )
 OPERATIONAL_SCHEMA_SHA256 = (
-    "76b0a8063b5fae1a9c2c04c45f4f3d0e12ba3a3648efc1049404c9e4b439ba69"
+    "b6240ddbe8f0ab725e66af45a11458886e36dffd220988cd1a1c81d118eb85e8"
 )
 STAGE34A_PROTOCOL_SHA256 = (
     "ac7b9f221b98a6e9b0c021d071642bb6ecc5706112d46d1432216e7ae0fe8a00"
@@ -102,7 +104,7 @@ def load_operational_amendment(
         amendment.get("schema_version") != OPERATIONAL_SCHEMA_VERSION
         or amendment.get("operational_protocol_id") != OPERATIONAL_PROTOCOL_ID
         or amendment.get("status")
-        != "prospectively_frozen_before_real_stage3_4b_1_execution"
+        != "operationally_refrozen_after_zero_fit_elapsed_time_guard_removal"
         or schema.get("type") != "object"
         or schema.get("additionalProperties") is not False
         or set(schema.get("required", [])) != set(amendment)
@@ -118,6 +120,25 @@ def load_operational_amendment(
         or amendment["source_adapter"]["stage3_4a_protocol_file_sha256"]
         != STAGE34A_PROTOCOL_SHA256
         or amendment["execution"]["real_data_fit_authorized_by_this_amendment"]
+        or amendment["elapsed_training_span_amendment"]
+        != {
+            "adequacy_principle": (
+                "training adequacy is established by observation counts, class "
+                "support, platform representation and strict chronology, not an "
+                "arbitrary elapsed "
+                "wall-clock duration"
+            ),
+            "failed_invocation_model_fits": 0,
+            "failed_invocation_optimizer_fits": 0,
+            "failed_invocation_repository_commit": (
+                "f97befc992eee8314bd5b7f7e2314bc79461e8a6"
+            ),
+            "fold_boundaries_changed": False,
+            "methodological_basis_found_for_48_hours": False,
+            "model_definitions_or_outcomes_changed_or_inspected": False,
+            "replacement_threshold_hours": None,
+            "superseded_guard_hours": 48,
+        }
     ):
         raise Stage3ValidationError(
             "stage34b_operational_baseline", "operational baseline differs"
@@ -281,7 +302,14 @@ def build_stage34b_preflight(
     operational_input: Stage34BOperationalInput,
     scientific_protocol: dict[str, Any],
     operational_amendment: dict[str, Any],
+    executable_bundle_sha256: str,
 ) -> Stage34BPreflight:
+    if len(executable_bundle_sha256) != 64 or any(
+        character not in "0123456789abcdef" for character in executable_bundle_sha256
+    ):
+        raise Stage3ValidationError(
+            "stage34b_executable_bundle_hash", "executable bundle hash is invalid"
+        )
     folds = construct_outer_folds(
         operational_input.rows,
         scientific_protocol,
@@ -302,9 +330,13 @@ def build_stage34b_preflight(
                 "training_drafts": len(fold.training),
                 "evaluation_drafts": len(fold.validation),
                 "evaluation_by_platform": dict(sorted(counts.items())),
-                "training_maximum_utc": _utc_text(train_max),
-                "evaluation_minimum_utc": _utc_text(test_min),
+                "training_by_platform": _platform_counts(fold.training),
+                "training_by_outcome": _outcome_counts(fold.training),
+                "evaluation_by_outcome": _outcome_counts(fold.validation),
+                "evaluation_start_inclusive_utc": _utc_text(fold.cutoff),
                 "evaluation_end_exclusive_utc": _utc_text(fold.validation_end),
+                "preceding_training_span_hours": _training_span_hours(fold),
+                "training_strictly_precedes_evaluation": True,
             }
         )
     scored = sum(row["evaluation_drafts"] for row in fold_rows)
@@ -316,13 +348,93 @@ def build_stage34b_preflight(
         raise Stage3ValidationError(
             "stage34b_preflight_count", "preflight fold counts differ"
         )
+    minimum = scientific_protocol["validation"]["minimum_training_support"]
+    inner_context_inputs = [
+        (fold.fold_id, fold.training, fold.cutoff) for fold in folds
+    ]
+    final_cutoff = _parse_timestamp(
+        scientific_protocol["validation"]["inner"]["final_selection_cutoff_utc"]
+    )
+    inner_context_inputs.append(
+        ("final_development_selection", operational_input.rows, final_cutoff)
+    )
+    inner_contexts = []
+    inner_fingerprint_inputs = []
+    for context_id, available_rows, cutoff in inner_context_inputs:
+        inner_folds = construct_inner_folds(
+            available_rows,
+            cutoff,
+            fold_count=scientific_protocol["validation"]["inner"]["folds"],
+            minimum_training_drafts=minimum["drafts"],
+            minimum_per_platform=minimum["per_platform_drafts"],
+        )
+        repeated = construct_inner_folds(
+            available_rows,
+            cutoff,
+            fold_count=scientific_protocol["validation"]["inner"]["folds"],
+            minimum_training_drafts=minimum["drafts"],
+            minimum_per_platform=minimum["per_platform_drafts"],
+        )
+        first_hash = _nested_fold_sha256(((context_id, inner_folds),))
+        if first_hash != _nested_fold_sha256(((context_id, repeated),)):
+            raise Stage3ValidationError(
+                "stage34b_inner_nondeterministic",
+                "inner-fold construction is not deterministic",
+            )
+        inner_fingerprint_inputs.append((context_id, inner_folds))
+        inner_contexts.append(
+            {
+                "selection_context": context_id,
+                "selection_cutoff_utc": _utc_text(cutoff),
+                "inner_folds": [
+                    {
+                        "inner_fold": fold.fold_id,
+                        "training_drafts": len(fold.training),
+                        "validation_drafts": len(fold.validation),
+                        "training_by_platform": _platform_counts(fold.training),
+                        "validation_by_platform": _platform_counts(fold.validation),
+                        "training_by_outcome": _outcome_counts(fold.training),
+                        "validation_by_outcome": _outcome_counts(fold.validation),
+                        "validation_start_inclusive_utc": _utc_text(fold.cutoff),
+                        "validation_end_exclusive_utc": _utc_text(
+                            fold.validation_end
+                        ),
+                        "preceding_training_span_hours": _training_span_hours(fold),
+                        "training_strictly_precedes_validation": True,
+                        "membership_overlap": False,
+                    }
+                    for fold in inner_folds
+                ],
+                "deterministic_reconstruction": True,
+                "paired_model_membership_and_ordering_identical": True,
+            }
+        )
+    budget = expected_fit_accounting(scientific_protocol)
+    reconciliation = operational_amendment["fit_reconciliation"]
+    if (
+        budget["expected_predictive_training_operations"]
+        != reconciliation["predictive_training_operations"]
+        or budget["predictive_optimizer_fits"]
+        != reconciliation["predictive_optimizer_fits"]
+        or budget["analytic_baseline_training_operations"]
+        != reconciliation["analytic_baseline_training_operations"]
+        or budget["calibration_metric_evaluations"]
+        != reconciliation["calibration_evaluations"]
+        or budget["bootstrap_model_fits"]
+        != reconciliation["bootstrap_model_fits"]
+    ):
+        raise Stage3ValidationError(
+            "stage34b_preflight_operation_budget",
+            "inner folds and frozen operation budget do not reconcile",
+        )
     summary = {
-        "schema_version": "stage3.4b-1-preflight-v1",
+        "schema_version": "stage3.4b-1-preflight-v2",
         "status": "zero_fit_preflight_passed",
         "scientific_protocol_id": scientific_protocol["protocol_id"],
         "scientific_protocol_sha256": PROTOCOL_SHA256,
         "operational_protocol_id": operational_amendment["operational_protocol_id"],
         "operational_amendment_sha256": OPERATIONAL_AMENDMENT_SHA256,
+        "executable_bundle_sha256": executable_bundle_sha256,
         "combined_input_sha256": operational_input.combined_input_sha256,
         "timestamp_join_sha256": operational_input.timestamp_join_sha256,
         "operational_input_sha256": operational_input.operational_input_sha256,
@@ -332,6 +444,14 @@ def build_stage34b_preflight(
         "outer_evaluation_drafts": expected_scored,
         "outer_blocks": fold_rows,
         "outer_fold_sha256": _fold_sha256(folds),
+        "inner_selection_contexts": inner_contexts,
+        "inner_fold_count": sum(
+            len(context["inner_folds"]) for context in inner_contexts
+        ),
+        "inner_fold_sha256": _nested_fold_sha256(tuple(inner_fingerprint_inputs)),
+        "elapsed_training_span_is_diagnostic_only": True,
+        "fit_operation_budget": budget,
+        "fit_operation_budget_reconciled": True,
         "paired_policy_count": 9,
         "paired_evaluation_rows_identical": True,
         "predictive_training_operations_executed": 0,
@@ -601,6 +721,55 @@ def _fold_sha256(folds: tuple[Any, ...]) -> str:
             ).hexdigest()
             digest.update(f"{private}\0{fold.fold_id}\n".encode("ascii"))
     return digest.hexdigest()
+
+
+def _nested_fold_sha256(
+    contexts: tuple[tuple[str, tuple[Any, ...]], ...],
+) -> str:
+    digest = hashlib.sha256()
+    for context_id, folds in contexts:
+        for fold in folds:
+            for membership, rows in (
+                ("training", fold.training),
+                ("validation", fold.validation),
+            ):
+                for position, row in enumerate(rows):
+                    private = hashlib.sha256(
+                        f"{row.draft.platform}\0{row.draft.match_id}".encode()
+                    ).hexdigest()
+                    digest.update(
+                        f"{context_id}\0{fold.fold_id}\0{membership}\0{position}\0"
+                        f"{private}\n".encode("ascii")
+                    )
+    return digest.hexdigest()
+
+
+def executable_bundle_sha256(paths: tuple[tuple[str, Path], ...]) -> str:
+    digest = hashlib.sha256()
+    labels = [label for label, _ in paths]
+    if len(labels) != len(set(labels)) or labels != sorted(labels):
+        raise Stage3ValidationError(
+            "stage34b_executable_bundle_shape",
+            "executable bundle labels must be unique and sorted",
+        )
+    for label, path in paths:
+        digest.update(f"{label}\0{sha256_file(path)}\n".encode("ascii"))
+    return digest.hexdigest()
+
+
+def _platform_counts(rows: tuple[TimedDraft, ...]) -> dict[str, int]:
+    counts = Counter(row.draft.platform for row in rows)
+    return {platform: counts[platform] for platform in ("eun1", "euw1")}
+
+
+def _outcome_counts(rows: tuple[TimedDraft, ...]) -> dict[str, int]:
+    counts = Counter(row.draft.outcome for row in rows)
+    return {"0": counts[0], "1": counts[1]}
+
+
+def _training_span_hours(fold: Any) -> float:
+    span = fold.cutoff - min(row.game_creation for row in fold.training)
+    return span.total_seconds() / 3600.0
 
 
 def _fit_reconciliation(
@@ -1054,6 +1223,15 @@ def _sha256_json(value: Any) -> str:
 
 def _utc_text(value: datetime) -> str:
     return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _parse_timestamp(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.utcoffset() != timedelta(0):
+        raise Stage3ValidationError(
+            "stage34b_preflight_timestamp", "preflight timestamp is not UTC"
+        )
+    return parsed
 
 
 def _fmt(value: float | None) -> str:

@@ -1,0 +1,37 @@
+{
+  "$id": "https://nexus-lens.local/schemas/stage3.4b-1-operational-amendment-v2.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "bootstrap_expansion": {"type": "object"},
+    "diagnostics": {"type": "object"},
+    "elapsed_training_span_amendment": {"type": "object"},
+    "execution": {"type": "object"},
+    "fit_reconciliation": {"type": "object"},
+    "frozen_baseline": {"type": "object"},
+    "immutability": {"type": "object"},
+    "operational_protocol_id": {"const": "stage3.4b-1-patch26.15-operational-amendment-v2"},
+    "privacy": {"type": "object"},
+    "publication": {"type": "object"},
+    "schema_version": {"const": "stage3.4b-1-operational-amendment-v2"},
+    "source_adapter": {"type": "object"},
+    "status": {"const": "operationally_refrozen_after_zero_fit_elapsed_time_guard_removal"}
+  },
+  "required": [
+    "bootstrap_expansion",
+    "diagnostics",
+    "elapsed_training_span_amendment",
+    "execution",
+    "fit_reconciliation",
+    "frozen_baseline",
+    "immutability",
+    "operational_protocol_id",
+    "privacy",
+    "publication",
+    "schema_version",
+    "source_adapter",
+    "status"
+  ],
+  "title": "Nexus Lens Stage 3.4B-1 operational amendment",
+  "type": "object"
+}

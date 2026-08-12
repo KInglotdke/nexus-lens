@@ -1,0 +1,294 @@
+{
+  "candidate_models": {
+    "combined_shared_interactions": {
+      "equation": "b + blue_composition - red_composition + blue_shared_synergy - red_shared_synergy + antisymmetric_shared_lane_counter",
+      "grid": [
+        {
+          "counter_dimension": 2,
+          "embedding_l2": 1.0,
+          "id": "combined-k2-l2-1",
+          "main_l2": 0.1,
+          "synergy_dimension": 2
+        },
+        {
+          "counter_dimension": 4,
+          "embedding_l2": 3.0,
+          "id": "combined-k4-l2-3",
+          "main_l2": 0.1,
+          "synergy_dimension": 4
+        }
+      ],
+      "information_sharing": "champion-role main effects, allied embeddings and lane attack/defense embeddings are reused across every eligible draft and interaction",
+      "objective": "mean binary logistic loss + 0.5 * main_l2 * squared composition norm + 0.5 * embedding_l2 * squared embedding norm; side intercept unregularized",
+      "parameter_count_formula": "1 + champion_role_count * (1 + synergy_dimension + 2 * counter_dimension)"
+    },
+    "composition_with_side_intercept": {
+      "equation": "b + sum_blue champion_role_weight - sum_red champion_role_weight",
+      "grid": [
+        {
+          "counter_dimension": 0,
+          "embedding_l2": 0.0,
+          "id": "side-l2-0.03",
+          "main_l2": 0.03,
+          "synergy_dimension": 0
+        },
+        {
+          "counter_dimension": 0,
+          "embedding_l2": 0.0,
+          "id": "side-l2-0.1",
+          "main_l2": 0.1,
+          "synergy_dimension": 0
+        },
+        {
+          "counter_dimension": 0,
+          "embedding_l2": 0.0,
+          "id": "side-l2-0.3",
+          "main_l2": 0.3,
+          "synergy_dimension": 0
+        }
+      ],
+      "information_sharing": "one regularized champion-role utility is shared across both team orientations and every draft",
+      "objective": "mean binary logistic loss + 0.5 * main_l2 * squared composition norm; side intercept unregularized",
+      "parameter_count_formula": "1 + champion_role_count"
+    },
+    "shared_allied_synergy": {
+      "equation": "b + blue_composition - red_composition + sum_role_pairs dot(s_blue_role_i, s_blue_role_j) - sum_role_pairs dot(s_red_role_i, s_red_role_j)",
+      "grid": [
+        {
+          "counter_dimension": 0,
+          "embedding_l2": 1.0,
+          "id": "synergy-k2-l2-1",
+          "main_l2": 0.1,
+          "synergy_dimension": 2
+        },
+        {
+          "counter_dimension": 0,
+          "embedding_l2": 3.0,
+          "id": "synergy-k4-l2-3",
+          "main_l2": 0.1,
+          "synergy_dimension": 4
+        }
+      ],
+      "information_sharing": "each supported champion-role has one bounded latent vector reused in every allied role-pair dot product",
+      "objective": "mean binary logistic loss + 0.5 * main_l2 * squared composition norm + 0.5 * embedding_l2 * squared synergy-embedding norm; side intercept unregularized",
+      "parameter_count_formula": "1 + champion_role_count * (1 + synergy_dimension)"
+    },
+    "shared_lane_counter": {
+      "equation": "b + blue_composition - red_composition + sum_roles dot(a_blue, d_red) - dot(a_red, d_blue)",
+      "grid": [
+        {
+          "counter_dimension": 2,
+          "embedding_l2": 1.0,
+          "id": "counter-k2-l2-1",
+          "main_l2": 0.1,
+          "synergy_dimension": 0
+        },
+        {
+          "counter_dimension": 4,
+          "embedding_l2": 3.0,
+          "id": "counter-k4-l2-3",
+          "main_l2": 0.1,
+          "synergy_dimension": 0
+        }
+      ],
+      "information_sharing": "each supported champion-role has attack and defense vectors reused against every same-role opponent; reversing opponents reverses the counter contrast",
+      "objective": "mean binary logistic loss + 0.5 * main_l2 * squared composition norm + 0.5 * embedding_l2 * squared attack-and-defense embedding norm; side intercept unregularized",
+      "parameter_count_formula": "1 + champion_role_count * (1 + 2 * counter_dimension)"
+    }
+  },
+  "capacity_estimate": {
+    "champion_role_count_reference": 710,
+    "expected_cpu_runtime_minutes": {
+      "lower": 15,
+      "upper": 35
+    },
+    "maximum_candidate_parameter_count": 9231,
+    "maximum_peak_memory_bytes": 1073741824,
+    "parameter_count_examples": {
+      "combined_k2": 4971,
+      "combined_k4": 9231,
+      "composition_with_side_intercept": 711,
+      "counter_k2": 3551,
+      "counter_k4": 6391,
+      "synergy_k2": 2131,
+      "synergy_k4": 3551
+    }
+  },
+  "data_scope": {
+    "eligible_drafts": 9414,
+    "platform_counts": {
+      "eun1": 4700,
+      "euw1": 4714
+    },
+    "public_patch": "26.15",
+    "queue_id": 420,
+    "source_bundle_sha256": "e753718197ae5caeddce5f34430b1f68638b792f32ca76c53afb22e3ddd6b68d"
+  },
+  "execution_budget": {
+    "analytic_baseline_training_operations": 8,
+    "bootstrap_model_fits": 0,
+    "calibration_metric_evaluations": 63,
+    "calibration_metric_optimizer_fits_upper_bound": 63,
+    "candidate_final_all_development_fits": 4,
+    "candidate_inner_selection_fits": 135,
+    "candidate_outer_fits": 16,
+    "expected_predictive_training_operations": 171,
+    "predictive_optimizer_fits": 163,
+    "stage3_4a_baseline_optimizer_fits": 8,
+    "total_optimizer_invocations_upper_bound_including_metric_regressions": 226
+  },
+  "future_holdout_policy": "A future sealed temporal holdout may be evaluated only after one prospectively frozen Stage 3.4B candidate passes every material-usefulness, leakage, determinism, privacy, convergence and coverage gate.",
+  "hyperparameter_policy": {
+    "calibration_method": "report_unregularized_logistic_intercept_and_slope_as_metrics_only; no prediction recalibration",
+    "convergence": "every optimizer fit must report success and finite parameters; otherwise fail closed",
+    "embedding_initialization": "deterministic centered normal scale 0.01 using seed plus canonical configuration and fold hash",
+    "embedding_support_minimum_training_matches": 10,
+    "maximum_iterations": 300,
+    "model_selection": "minimum mean inner-fold log loss within absolute tolerance 1e-12",
+    "optimizer": "scipy.optimize.minimize L-BFGS-B with analytic gradient",
+    "optimizer_tolerance": 1e-8,
+    "rate_baseline_minimum_training_matches": 10,
+    "safe_named_summary_minimum_support": 100,
+    "seed": 34401,
+    "tie_break": "largest embedding_l2, then largest main_l2, then smallest total latent dimension, then lexicographically smallest configuration id",
+    "unseen_or_under_supported_embedding": "zero_vector",
+    "unseen_linear_or_direct_pair_feature": "zero_contribution"
+  },
+  "material_usefulness_gate": {
+    "calibration_intercept_absolute_maximum": 0.02,
+    "calibration_slope_maximum": 1.2,
+    "calibration_slope_minimum": 0.8,
+    "chronological_blocks_with_improvement_minimum": 2,
+    "coverage_minimum": 0.95,
+    "ece_maximum": 0.02,
+    "each_platform_log_loss_improvement_vs_composition_minimum": 0.001,
+    "log_loss_improvement_vs_blue_intercept_minimum": 0.002,
+    "log_loss_improvement_vs_composition_minimum": 0.002,
+    "no_platform_worse_than_blue_intercept": true,
+    "overall_brier_improvement_vs_both_baselines_minimum": 0.001,
+    "paired_log_loss_interval_upper_bound_below_zero": true,
+    "role_coverage_maximum_drop": 0.05
+  },
+  "metrics": {
+    "bootstrap": {
+      "confidence_level": 0.95,
+      "preserve_candidate_vs_every_baseline_log_loss_and_brier_intervals": true,
+      "replicates": 2000,
+      "rng_and_algorithm": "NumPy Generator PCG64 seeded once; independent within-stratum multinomial resampling counts applied to precomputed paired loss differences",
+      "seed": 34201,
+      "strata": [
+        "platform",
+        "outer_block"
+      ],
+      "unit": "match"
+    },
+    "calibration_bins": 10,
+    "coverage_definition": "fraction of the shared role-complete outer test rows receiving a finite probability; because every eligible completed draft contains all five roles, per-role factual coverage equals draft coverage and is reconciled separately for every role",
+    "primary": "paired_per_match_log_loss_difference",
+    "published": [
+      "log_loss",
+      "brier_score",
+      "calibration_intercept",
+      "calibration_slope",
+      "expected_calibration_error",
+      "prediction_dispersion",
+      "coverage",
+      "overall_platform_and_outer_block_results"
+    ]
+  },
+  "models": {
+    "baseline_definitions": {
+      "constant_0_5": "predict 0.5 without training",
+      "fold_local_champion_role_rate_minimum_support_10": "within the training fold count wins and games for each champion-role from that champion's team perspective; retain support >= 10; score as training Blue rate + one half of mean Blue rate minus mean Red rate; use training Blue rate for unseen or unsupported champion-roles",
+      "stage3_4a_composition_only_l2_0_1_no_intercept": "refit the frozen signed champion-role logistic specification with L2 0.1 and no intercept inside each outer training fold",
+      "stage3_4a_composition_plus_direct_matchup_l2_0_1_no_intercept": "refit the frozen signed champion-role plus exact oriented same-lane matchup logistic specification with L2 0.1 and no intercept inside each outer training fold",
+      "training_fold_blue_win_rate_intercept": "predict the arithmetic Blue-win rate observed only in the outer training fold"
+    },
+    "baselines": [
+      "constant_0_5",
+      "training_fold_blue_win_rate_intercept",
+      "stage3_4a_composition_only_l2_0_1_no_intercept",
+      "stage3_4a_composition_plus_direct_matchup_l2_0_1_no_intercept",
+      "fold_local_champion_role_rate_minimum_support_10"
+    ],
+    "candidates": [
+      "composition_with_side_intercept",
+      "shared_allied_synergy",
+      "shared_lane_counter",
+      "combined_shared_interactions"
+    ]
+  },
+  "privacy": {
+    "aggregate_only_publication": true,
+    "external_paths_published": false,
+    "low_support_slices_published": false,
+    "match_or_player_identifiers_published": false,
+    "oof_rows_ephemeral_only": true,
+    "player_history_features_used": false
+  },
+  "protocol_id": "stage3.4b-1-patch26.15-protocol-v2",
+  "schema_version": "stage3.4b-1-protocol-v2",
+  "status": "operationally_refrozen_after_zero_fit_elapsed_time_guard_removal",
+  "target": {
+    "candidate_contrast_interpretation": "mechanical_non_causal",
+    "definition": "blue_lower_numeric_team_wins",
+    "observation": "one_completed_role_complete_draft",
+    "probability": "P(Blue/lower-numeric team wins)"
+  },
+  "validation": {
+    "identical_timestamp_policy": "all matches with an identical UTC creation timestamp remain in the same chronological partition",
+    "inner": {
+      "final_selection_cutoff_utc": "2026-08-11T00:00:00Z",
+      "folds": 3,
+      "policy": "for each cutoff use the three complete one-day UTC intervals immediately preceding it as validation folds with all earlier observations as expanding training",
+      "training_strictly_precedes_validation": true
+    },
+    "minimum_training_support": {
+      "drafts": 800,
+      "per_platform_drafts": 300
+    },
+    "observed_timestamp_span_utc": {
+      "maximum": "2026-08-11T00:15:04.429Z",
+      "minimum": "2026-07-29T10:28:34.035Z"
+    },
+    "outer_blocks": [
+      {
+        "end_exclusive_utc": "2026-08-05T00:00:00Z",
+        "expected_eun1_test_drafts": 669,
+        "expected_euw1_test_drafts": 616,
+        "expected_test_drafts": 1285,
+        "id": "outer-0",
+        "start_inclusive_utc": "2026-08-03T00:00:00Z"
+      },
+      {
+        "end_exclusive_utc": "2026-08-07T00:00:00Z",
+        "expected_eun1_test_drafts": 954,
+        "expected_euw1_test_drafts": 776,
+        "expected_test_drafts": 1730,
+        "id": "outer-1",
+        "start_inclusive_utc": "2026-08-05T00:00:00Z"
+      },
+      {
+        "end_exclusive_utc": "2026-08-09T00:00:00Z",
+        "expected_eun1_test_drafts": 982,
+        "expected_euw1_test_drafts": 872,
+        "expected_test_drafts": 1854,
+        "id": "outer-2",
+        "start_inclusive_utc": "2026-08-07T00:00:00Z"
+      },
+      {
+        "end_exclusive_utc": "2026-08-12T00:00:00Z",
+        "expected_eun1_test_drafts": 629,
+        "expected_euw1_test_drafts": 870,
+        "expected_test_drafts": 1499,
+        "id": "outer-3",
+        "start_inclusive_utc": "2026-08-09T00:00:00Z"
+      }
+    ],
+    "platform_policy": "no downsampling; use identical UTC boundaries, require both platforms in every train/test fold, report each platform, and stratify paired bootstrap by platform and outer block",
+    "real_outcomes_inspected_for_boundary_selection": false,
+    "scored_outer_test_drafts": 6368,
+    "selection_tie_uses_outcome": false,
+    "unscored_initial_training_drafts": 3046
+  }
+}

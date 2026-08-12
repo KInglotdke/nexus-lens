@@ -32,11 +32,11 @@ from nexus_lens.composition_modeling import (
     vectorize_draft,
 )
 
-PROTOCOL_SCHEMA_VERSION = "stage3.4b-1-protocol-v1"
-PROTOCOL_ID = "stage3.4b-1-patch26.15-protocol-v1"
-PROTOCOL_SHA256 = "e23a0c74517ea9a6700875c0a2ab8beb9e977cbdce9a1279ba4153beadae0c7f"
+PROTOCOL_SCHEMA_VERSION = "stage3.4b-1-protocol-v2"
+PROTOCOL_ID = "stage3.4b-1-patch26.15-protocol-v2"
+PROTOCOL_SHA256 = "2f8a0ddb29f1bcb48f160c254d98c647d2ee8f16d852bfe91c5fdd33d1f7e920"
 PROTOCOL_SCHEMA_SHA256 = (
-    "5bcf3d8cc929edc8f0142758fbd3372c832cb62a3511fd30856c2674954127f7"
+    "c20b76702cdd72ebc7725cf5b61dff5525c00e2488b050179642fbcfe8b4c9f0"
 )
 RESULT_SCHEMA_VERSION = "stage3.4b-1-development-results-v1"
 MODEL_VARIANTS_B = (
@@ -490,7 +490,7 @@ def construct_outer_folds(
     enforce_frozen_counts: bool,
 ) -> tuple[ChronologicalFold, ...]:
     ordered = _validate_timed_rows(rows)
-    minimum = protocol["validation"]["minimum_preceding_training"]
+    minimum = protocol["validation"]["minimum_training_support"]
     folds = []
     seen_validation: set[tuple[str, str]] = set()
     for block in protocol["validation"]["outer_blocks"]:
@@ -506,7 +506,6 @@ def construct_outer_folds(
             start,
             minimum_drafts=int(minimum["drafts"]),
             minimum_per_platform=int(minimum["per_platform_drafts"]),
-            minimum_hours=int(minimum["hours"]),
         )
         keys = {_private_key(row) for row in validation}
         if seen_validation & keys:
@@ -550,7 +549,6 @@ def construct_inner_folds(
     fold_count: int,
     minimum_training_drafts: int,
     minimum_per_platform: int,
-    minimum_hours: int,
 ) -> tuple[ChronologicalFold, ...]:
     ordered = _validate_timed_rows(outer_training)
     folds = []
@@ -569,7 +567,6 @@ def construct_inner_folds(
             validation_start,
             minimum_drafts=minimum_training_drafts,
             minimum_per_platform=minimum_per_platform,
-            minimum_hours=minimum_hours,
         )
         folds.append(
             ChronologicalFold(
@@ -946,7 +943,7 @@ def evaluate_stage34b(
         rows, protocol, enforce_frozen_counts=enforce_frozen_counts
     )
     hyper = protocol["hyperparameter_policy"]
-    minimum = protocol["validation"]["minimum_preceding_training"]
+    minimum = protocol["validation"]["minimum_training_support"]
     grids = _candidate_grids(protocol)
     fit_counter = _FitCounter(progress_callback)
     calibration_counter = _CalibrationCounter(progress_callback)
@@ -966,7 +963,6 @@ def evaluate_stage34b(
             fold_count=protocol["validation"]["inner"]["folds"],
             minimum_training_drafts=minimum["drafts"],
             minimum_per_platform=minimum["per_platform_drafts"],
-            minimum_hours=minimum["hours"],
         )
         training_drafts = tuple(row.draft for row in outer.training)
         operation = fit_counter.start(
@@ -1178,7 +1174,6 @@ def evaluate_stage34b(
         fold_count=protocol["validation"]["inner"]["folds"],
         minimum_training_drafts=minimum["drafts"],
         minimum_per_platform=minimum["per_platform_drafts"],
-        minimum_hours=minimum["hours"],
     )
     final_models = {}
     final_selection = {}
@@ -2077,7 +2072,6 @@ def _validate_chronological_fold(
     *,
     minimum_drafts: int,
     minimum_per_platform: int,
-    minimum_hours: int,
 ) -> None:
     if not training or not validation:
         raise Stage3ValidationError(
@@ -2105,10 +2099,12 @@ def _validate_chronological_fold(
             "stage34b_platform_training_minimum",
             "chronological platform training count is too small",
         )
-    span = cutoff - min(row.game_creation for row in training)
-    if span < timedelta(hours=minimum_hours):
+    if {row.draft.outcome for row in training} != {0, 1} or {
+        row.draft.outcome for row in validation
+    } != {0, 1}:
         raise Stage3ValidationError(
-            "stage34b_training_span_minimum", "chronological training span is too short"
+            "stage34b_class_support",
+            "chronological training and validation must contain both outcome classes",
         )
     train_times = {row.game_creation for row in training}
     validation_times = {row.game_creation for row in validation}

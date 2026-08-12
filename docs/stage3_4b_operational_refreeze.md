@@ -1,6 +1,7 @@
 # Stage 3.4B-1 operational refreeze
 
-Status: **operationally frozen before any real Stage 3.4B-1 model fit**.
+Status: **superseded by the zero-fit elapsed-span amendment in
+`stage3_4b_elapsed_span_amendment.md`**.
 
 This amendment repairs execution infrastructure only. The scientific protocol,
 folds, equations, features, grids, support thresholds, seeds, optimizer settings,

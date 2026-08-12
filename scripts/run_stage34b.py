@@ -18,6 +18,7 @@ from nexus_lens.stage34b_operations import (
     OperationalSource,
     build_publication_payloads,
     build_stage34b_preflight,
+    executable_bundle_sha256,
     load_operational_amendment,
     load_stage34b_operational_input,
     reconstruct_bundle_hash,
@@ -127,6 +128,29 @@ def main() -> int:
             operational_input=operational_input,
             scientific_protocol=protocol,
             operational_amendment=amendment,
+            executable_bundle_sha256=executable_bundle_sha256(
+                tuple(
+                    sorted(
+                        (
+                            ("operational_amendment", args.operational_amendment),
+                            ("operational_schema", args.operational_schema),
+                            ("runner", Path(__file__)),
+                            ("scientific_protocol", args.scientific_protocol),
+                            ("scientific_schema", args.scientific_schema),
+                            (
+                                "stage34b_implementation",
+                                Path(__file__).resolve().parents[1]
+                                / "src/nexus_lens/stage34b.py",
+                            ),
+                            (
+                                "stage34b_operations",
+                                Path(__file__).resolve().parents[1]
+                                / "src/nexus_lens/stage34b_operations.py",
+                            ),
+                        )
+                    )
+                )
+            ),
         )
         if args.preflight:
             if args.authorize_real_fit:
@@ -282,7 +306,7 @@ def _validate_locations(
     sources = tuple(path.resolve() for path in source_directories)
     expected_output = (
         repository
-        / "config/evaluation/stage3.4b-1-patch26.15-protocol-v1/development-v1"
+        / "config/evaluation/stage3.4b-1-patch26.15-protocol-v2/development-v1"
     ).resolve()
     if output != expected_output or output.exists():
         raise ValueError("output must be the new protocol development-v1 directory")
@@ -341,6 +365,10 @@ def _print_preflight(summary: dict[str, Any]) -> None:
     print(f"  combined input sha256: {summary['combined_input_sha256']}")
     print(f"  timestamp join sha256: {summary['timestamp_join_sha256']}")
     print(f"  outer fold sha256: {summary['outer_fold_sha256']}")
+    print(f"  inner folds: {summary['inner_fold_count']}")
+    print(f"  inner fold sha256: {summary['inner_fold_sha256']}")
+    print(f"  executable bundle sha256: {summary['executable_bundle_sha256']}")
+    print("  elapsed training spans: diagnostic only")
     print("  paired evaluation rows identical: True")
 
 

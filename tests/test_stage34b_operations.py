@@ -23,9 +23,12 @@ from nexus_lens.stage34b import (
     MODEL_VARIANTS_B,
     PROTOCOL_ID,
     RESULT_SCHEMA_VERSION,
+    ChronologicalFold,
     SharedInteractionModel,
     SharedModelConfig,
     Stage34BEvaluation,
+    TimedDraft,
+    load_stage34b_protocol,
 )
 from nexus_lens.stage34b_operations import (
     OPERATIONAL_AMENDMENT_SHA256,
@@ -33,6 +36,7 @@ from nexus_lens.stage34b_operations import (
     Stage34BOperationalInput,
     Stage34BPreflight,
     build_publication_payloads,
+    build_stage34b_preflight,
     join_draft_timestamps,
     load_operational_amendment,
     load_stage34b_operational_input,
@@ -42,13 +46,9 @@ from nexus_lens.stage34b_operations import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-PROTOCOL_DIRECTORY = (
-    ROOT / "config/evaluation/stage3.4b-1-patch26.15-protocol-v1"
-)
-AMENDMENT_PATH = PROTOCOL_DIRECTORY / "operational-amendment-v1.json"
-AMENDMENT_SCHEMA_PATH = (
-    PROTOCOL_DIRECTORY / "operational-amendment-v1.schema.json"
-)
+PROTOCOL_DIRECTORY = ROOT / "config/evaluation/stage3.4b-1-patch26.15-protocol-v2"
+AMENDMENT_PATH = PROTOCOL_DIRECTORY / "operational-amendment-v2.json"
+AMENDMENT_SCHEMA_PATH = PROTOCOL_DIRECTORY / "operational-amendment-v2.schema.json"
 
 
 def test_operational_amendment_is_exact_and_expands_only_paired_comparisons() -> None:
@@ -60,6 +60,23 @@ def test_operational_amendment_is_exact_and_expands_only_paired_comparisons() ->
         "cc5dd3ab764cf69eff4488890bbcd361e220b8df"
     )
     assert amendment["execution"]["real_data_fit_authorized_by_this_amendment"] is False
+    assert amendment["elapsed_training_span_amendment"] == {
+        "adequacy_principle": (
+            "training adequacy is established by observation counts, class support, "
+            "platform representation and strict chronology, not an arbitrary elapsed "
+            "wall-clock duration"
+        ),
+        "failed_invocation_model_fits": 0,
+        "failed_invocation_optimizer_fits": 0,
+        "failed_invocation_repository_commit": (
+            "f97befc992eee8314bd5b7f7e2314bc79461e8a6"
+        ),
+        "fold_boundaries_changed": False,
+        "methodological_basis_found_for_48_hours": False,
+        "model_definitions_or_outcomes_changed_or_inspected": False,
+        "replacement_threshold_hours": None,
+        "superseded_guard_hours": 48,
+    }
     assert amendment["bootstrap_expansion"]["replicates"] == 2000
     assert len(amendment["bootstrap_expansion"]["comparison_pairs"]) == 5
     assert stage34b._sha256_json(amendment) == OPERATIONAL_AMENDMENT_SHA256
@@ -83,6 +100,94 @@ def test_timestamp_join_is_complete_utc_and_deterministic() -> None:
     invalid[("euw1", "two")] = datetime(2026, 8, 2, 1)
     with pytest.raises(Stage3ValidationError, match="not UTC-aware"):
         join_draft_timestamps(drafts, invalid)
+
+
+def test_preflight_constructs_every_real_inner_selection_context(
+    monkeypatch,
+) -> None:
+    protocol = load_stage34b_protocol(
+        PROTOCOL_DIRECTORY / "protocol.json",
+        schema_path=PROTOCOL_DIRECTORY / "protocol.schema.json",
+    )
+    amendment = load_operational_amendment(
+        AMENDMENT_PATH, schema_path=AMENDMENT_SCHEMA_PATH
+    )
+    base = tuple(
+        TimedDraft(
+            _draft(f"base-{index}", platform, outcome),
+            datetime(2026, 7, 29, 12 + index, tzinfo=UTC),
+        )
+        for index, (platform, outcome) in enumerate(
+            (("eun1", 0), ("eun1", 1), ("euw1", 0), ("euw1", 1))
+        )
+    )
+
+    def repeated(rows, count):
+        return tuple(rows[index % len(rows)] for index in range(count))
+
+    outer_counts = (1285, 1730, 1854, 1499)
+    outer_folds = tuple(
+        ChronologicalFold(
+            fold_id=f"outer-{index}",
+            cutoff=datetime(2026, 8, 3 + 2 * index, tzinfo=UTC),
+            validation_end=datetime(
+                2026, 8, 5 + 2 * index if index < 3 else 12, tzinfo=UTC
+            ),
+            training=repeated(base, 3046 + index),
+            validation=repeated(
+                tuple(
+                    TimedDraft(
+                        row.draft, datetime(2026, 8, 3 + 2 * index, 1, tzinfo=UTC)
+                    )
+                    for row in base
+                ),
+                outer_counts[index],
+            ),
+        )
+        for index in range(4)
+    )
+    monkeypatch.setattr(
+        stage34b_operations,
+        "construct_outer_folds",
+        lambda *args, **kwargs: outer_folds,
+    )
+    calls = []
+
+    def inner_folds(rows, cutoff, **kwargs):
+        calls.append(cutoff)
+        return tuple(
+            ChronologicalFold(
+                fold_id=f"inner-{index}",
+                cutoff=cutoff,
+                validation_end=cutoff,
+                training=base,
+                validation=base,
+            )
+            for index in range(3)
+        )
+
+    monkeypatch.setattr(stage34b_operations, "construct_inner_folds", inner_folds)
+    operational = Stage34BOperationalInput(
+        rows=base,
+        accepted_counts={"overall": 10_000},
+        eligible_counts={"eune": 4700, "euw": 4714, "overall": 9414},
+        source_audit=(),
+        combined_input_sha256="a" * 64,
+        timestamp_join_sha256="b" * 64,
+        operational_input_sha256="c" * 64,
+    )
+
+    summary = build_stage34b_preflight(
+        operational_input=operational,
+        scientific_protocol=protocol,
+        operational_amendment=amendment,
+        executable_bundle_sha256="d" * 64,
+    ).summary
+
+    assert len(calls) == 10  # five contexts, each reconstructed twice
+    assert summary["inner_fold_count"] == 15
+    assert summary["fit_operation_budget_reconciled"] is True
+    assert summary["model_fits_executed"] == 0
 
 
 def test_source_adapter_uses_hash_verified_stage31_timestamp_join(
@@ -316,12 +421,14 @@ def test_observational_timing_does_not_change_scientific_bundle_hash() -> None:
     assert first["timing_summary.json"] != second["timing_summary.json"]
     first_manifest = json.loads(first["bundle_manifest.json"])
     second_manifest = json.loads(second["bundle_manifest.json"])
-    assert first_manifest["scientific_deterministic_bundle_sha256"] == (
-        second_manifest["scientific_deterministic_bundle_sha256"]
+    assert (
+        first_manifest["scientific_deterministic_bundle_sha256"]
+        == (second_manifest["scientific_deterministic_bundle_sha256"])
     )
-    assert first_manifest["observational_file_sha256"] != second_manifest[
-        "observational_file_sha256"
-    ]
+    assert (
+        first_manifest["observational_file_sha256"]
+        != second_manifest["observational_file_sha256"]
+    )
 
 
 def test_publication_privacy_rejects_identifiers_paths_and_nonfinite() -> None:
@@ -335,9 +442,7 @@ def test_publication_privacy_rejects_identifiers_paths_and_nonfinite() -> None:
 
 def test_diagnostic_log_is_privacy_checked_and_bounded(tmp_path: Path) -> None:
     path = tmp_path / "diagnostic.jsonl"
-    diagnostic = stage34b_cli._DiagnosticLog(
-        path, maximum_events=1, maximum_bytes=1000
-    )
+    diagnostic = stage34b_cli._DiagnosticLog(path, maximum_events=1, maximum_bytes=1000)
     try:
         diagnostic({"event": "safe", "phase": "synthetic"})
         with pytest.raises(Stage3ValidationError, match="event limit"):
@@ -369,10 +474,16 @@ def test_cli_preflight_executes_zero_fits_and_writes_nothing(
             "combined_input_sha256": "a" * 64,
             "timestamp_join_sha256": "b" * 64,
             "outer_fold_sha256": "c" * 64,
+            "inner_fold_count": 15,
+            "inner_fold_sha256": "e" * 64,
+            "executable_bundle_sha256": "d" * 64,
         }
     )
     monkeypatch.setattr(stage34b_cli, "_verify_git_state", lambda value: None)
     monkeypatch.setattr(stage34b_cli, "_validate_locations", lambda **kwargs: None)
+    monkeypatch.setattr(
+        stage34b_cli, "executable_bundle_sha256", lambda paths: "d" * 64
+    )
     monkeypatch.setattr(stage34b_cli, "load_stage34b_protocol", lambda *a, **k: {})
     monkeypatch.setattr(stage34b_cli, "load_operational_amendment", lambda *a, **k: {})
     monkeypatch.setattr(
@@ -535,7 +646,7 @@ def _preflight() -> Stage34BPreflight:
         operational_input_sha256="c" * 64,
     )
     summary = {
-        "schema_version": "stage3.4b-1-preflight-v1",
+        "schema_version": "stage3.4b-1-preflight-v2",
         "eligible_counts": operational_input.eligible_counts,
         "outer_evaluation_drafts": 6368,
         "source_audit": (),

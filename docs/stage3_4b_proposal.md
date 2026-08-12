@@ -3,7 +3,7 @@
 Status: **prospectively frozen before any Stage 3.4B-1 fit on real data**.
 
 The machine-readable contract is
-`config/evaluation/stage3.4b-1-patch26.15-protocol-v1/protocol.json`. Stage
+`config/evaluation/stage3.4b-1-patch26.15-protocol-v2/protocol.json`. Stage
 3.4B-1 is limited to the 9,414 already eligible patch-26.15 Ranked Solo/Duo
 drafts. It introduces no player-history features, new collection, recommendation
 policy, causal claim, or SHAP analysis.
@@ -33,10 +33,11 @@ UTC game-creation timestamps establish four adjacent outer test blocks:
 
 The 3,046 drafts before the first boundary form initial unscored training data;
 6,368 drafts are scored exactly once. Each later training partition expands to
-include all earlier observations. Every fold requires at least 800 preceding drafts,
-300 from each platform, and 48 hours of preceding time. EUNE and EUW use identical
-boundaries without downsampling. Platform is subgroup and bootstrap-stratum metadata,
-never a predictive feature.
+include all earlier observations. Every fold requires at least 800 preceding drafts
+and 300 from each platform, with both outcomes represented. EUNE and EUW use identical
+boundaries without downsampling. Strict chronology is enforced, while elapsed training
+span is diagnostic rather than a validity threshold. Platform is subgroup and
+bootstrap-stratum metadata, never a predictive feature.
 
 Each selection context uses three one-day inner validation intervals immediately
 before its cutoff, with all earlier observations as expanding training. Final
