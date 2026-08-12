@@ -1,0 +1,16 @@
+{
+  "finite_values": true,
+  "fit_counts_reconciled": true,
+  "future_holdout_gate_passed": false,
+  "paired_rows_reconciled": true,
+  "platform_used_as_predictive_feature": false,
+  "privacy": {
+    "aggregate_only": true,
+    "external_paths_published": false,
+    "match_or_player_identifiers_published": false,
+    "oof_rows_published": false
+  },
+  "ready_for_recommendations": false,
+  "row_level_predictions_published": false,
+  "schema_version": "stage3.4b-1-quality-v1"
+}

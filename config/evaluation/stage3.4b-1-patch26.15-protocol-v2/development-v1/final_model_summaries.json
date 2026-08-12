@@ -1,0 +1,46 @@
+{
+  "interpretation": "aggregate_configuration_summary_not_deployable_model",
+  "models": [
+    {
+      "coefficients_published": false,
+      "embedding_feature_count": 437,
+      "model": "composition_with_side_intercept",
+      "optimizer_iterations": 8,
+      "optimizer_status": "converged",
+      "parameter_count": 711,
+      "selected_config_id": "side-l2-0.03",
+      "vocabulary_size": 710
+    },
+    {
+      "coefficients_published": false,
+      "embedding_feature_count": 437,
+      "model": "shared_allied_synergy",
+      "optimizer_iterations": 7,
+      "optimizer_status": "converged",
+      "parameter_count": 1585,
+      "selected_config_id": "synergy-k2-l2-1",
+      "vocabulary_size": 710
+    },
+    {
+      "coefficients_published": false,
+      "embedding_feature_count": 437,
+      "model": "shared_lane_counter",
+      "optimizer_iterations": 9,
+      "optimizer_status": "converged",
+      "parameter_count": 4207,
+      "selected_config_id": "counter-k4-l2-3",
+      "vocabulary_size": 710
+    },
+    {
+      "coefficients_published": false,
+      "embedding_feature_count": 437,
+      "model": "combined_shared_interactions",
+      "optimizer_iterations": 9,
+      "optimizer_status": "converged",
+      "parameter_count": 5955,
+      "selected_config_id": "combined-k4-l2-3",
+      "vocabulary_size": 710
+    }
+  ],
+  "schema_version": "stage3.4b-1-final-model-summaries-v1"
+}

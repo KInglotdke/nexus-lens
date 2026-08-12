@@ -1,0 +1,32 @@
+{
+  "observational_file_sha256": {
+    "execution_environment.json": "2c5c8fc3343a515663a4cfc47d59533062241ceb8f9397230a1a9f0b9e09a6a9",
+    "timing_summary.json": "d2d2bc0b4ba03532f9456b74a2e208597b96b42cec6388fbd52cd779795b384a"
+  },
+  "observational_values_are_excluded_from_scientific_fingerprint": true,
+  "operational_amendment_sha256": "9c92bf749e840591d56bef4c8f9551205bd3af3e232dfdf4c92aa20f80347055",
+  "operational_protocol_id": "stage3.4b-1-patch26.15-operational-amendment-v2",
+  "published_file_sha256": {
+    "development_report.md": "7f5ba07f8608a7fdec740d376024ff098700448a6b3a64eec6519f1006d8a0f9",
+    "development_results.json": "36f1d4cd29a24d04890e1ba92f64fa68831fa4df737ef4c249d664d49b724c1e",
+    "execution_environment.json": "2c5c8fc3343a515663a4cfc47d59533062241ceb8f9397230a1a9f0b9e09a6a9",
+    "final_model_summaries.json": "fbe4021836de2677e0a2d80f1c30d104e659217898a9ee8b2d6acc6d05ba8c6a",
+    "fit_reconciliation.json": "050172a651b9aa33e9dde09f009a6faa7519a45054ad0fe1d9d55a7de3f57317",
+    "input_manifest.json": "cc0d725d35c3c23f86f3f19a7cf382d805fd5feae4adb3f2a36eea36145224ac",
+    "quality_report.json": "8c98ad23a0bbd1abf8ce7e82e9e4373331313edb20b3487e2016929b5b24c4e5",
+    "timing_summary.json": "d2d2bc0b4ba03532f9456b74a2e208597b96b42cec6388fbd52cd779795b384a"
+  },
+  "repository_commit": "e1fb1da17d7066bc729cbb83a9f5d0b7c5ea226b",
+  "schema_version": "stage3.4b-1-bundle-manifest-v1",
+  "scientific_deterministic_bundle_sha256": "577b151d377e0df3f976f67065be6f852e33a8cca2286424b36a3de8e4b47dcc",
+  "scientific_deterministic_file_sha256": {
+    "development_report.md": "7f5ba07f8608a7fdec740d376024ff098700448a6b3a64eec6519f1006d8a0f9",
+    "development_results.json": "36f1d4cd29a24d04890e1ba92f64fa68831fa4df737ef4c249d664d49b724c1e",
+    "final_model_summaries.json": "fbe4021836de2677e0a2d80f1c30d104e659217898a9ee8b2d6acc6d05ba8c6a",
+    "fit_reconciliation.json": "050172a651b9aa33e9dde09f009a6faa7519a45054ad0fe1d9d55a7de3f57317",
+    "input_manifest.json": "cc0d725d35c3c23f86f3f19a7cf382d805fd5feae4adb3f2a36eea36145224ac",
+    "quality_report.json": "8c98ad23a0bbd1abf8ce7e82e9e4373331313edb20b3487e2016929b5b24c4e5"
+  },
+  "scientific_protocol_id": "stage3.4b-1-patch26.15-protocol-v2",
+  "scientific_protocol_sha256": "2f8a0ddb29f1bcb48f160c254d98c647d2ee8f16d852bfe91c5fdd33d1f7e920"
+}

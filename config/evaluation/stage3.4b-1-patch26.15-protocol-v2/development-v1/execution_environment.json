@@ -1,0 +1,10 @@
+{
+  "environment_file_loaded": false,
+  "numpy": "2.5.1",
+  "platform_feature_used": false,
+  "python": "3.12.10",
+  "python_implementation": "CPython",
+  "riot_api_used": false,
+  "schema_version": "stage3.4b-1-execution-environment-v1",
+  "scipy": "1.18.0"
+}

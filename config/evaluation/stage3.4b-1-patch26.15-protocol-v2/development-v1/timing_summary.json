@@ -1,0 +1,31 @@
+{
+  "event_count": 487,
+  "model_seconds": {
+    "combined_shared_interactions": 27.84892889999901,
+    "composition_only": 0.414644699980272,
+    "composition_plus_lane_matchups": 0.7702861000143457,
+    "composition_with_side_intercept": 9.440769399923738,
+    "fold_local_champion_role_rate_minimum_support_10": 0.1019854000187479,
+    "shared_allied_synergy": 21.77888179983711,
+    "shared_lane_counter": 13.896285800001351,
+    "training_fold_blue_win_rate_intercept": 0.009056700015207753
+  },
+  "phase_seconds": {
+    "calibration": 0.4259853998955805,
+    "evaluation": 115.39085160000832,
+    "final_candidate": 3.7498337000142783,
+    "final_development": 30.83617000002414,
+    "final_inner_selection": 20.47993599998881,
+    "metrics": 1.6884659999923315,
+    "outer-0_inner_selection": 4.5614966999564786,
+    "outer-1_inner_selection": 8.269422600016696,
+    "outer-2_inner_selection": 11.514749399997527,
+    "outer-3_inner_selection": 15.324277899897425,
+    "outer_baseline": 1.2959729000285733,
+    "outer_candidate": 9.065149599889992,
+    "outer_evaluation": 79.50683940001181
+  },
+  "schema_version": "stage3.4b-1-timing-v1",
+  "timing_is_operational_not_a_scientific_input": true,
+  "wall_seconds": 115.39522130001569
+}
