@@ -491,3 +491,26 @@ all influence the sample. A bounded sample is not the complete ladder population
 Deferred work includes broader sampling validation, Parquet migration, statistical
 power criteria, production-key operations, scheduling, recommendation logic, and a
 user-facing product.
+
+## Stage 3.5A timeline lineage
+
+Stage 3.5A creates a new lineage beside—not inside—the sealed Stage 3.1–3.4B
+trees. Six checksummed Stage 3.1 sources—the four baseline components plus one
+bounded extension per platform—provide the exact patch-26.15 match, participant,
+timestamp, champion, position, and focal-player pseudonym records.
+Match-V5 timelines are stored privately in platform-separated, content-addressed
+directories. A SQLite catalog contains the private match-to-content mapping,
+terminal availability state, and cumulative request ledger.
+
+Timeline transformation requires 5/10/15-minute frames and produces two symmetric
+top-lane perspectives per private match group, each weighted 0.5. The private table
+contains nested primary/exploratory trajectory targets, tower time/label,
+post-selection intervention proxies, secondary game outcome, and strictly earlier
+focal history. The prospective champion-select feature adapter exposes only legal
+context, champions, and focal history. Opponent-account information and every
+outcome are structurally excluded.
+
+Private row data and raw timelines remain outside Git. Atomic aggregate publication
+contains only distributions, counts, support summaries, correlations, fingerprints,
+quality gates, and limitations. Future chronological folds and bootstraps must use
+the private match group rather than the two perspective rows.

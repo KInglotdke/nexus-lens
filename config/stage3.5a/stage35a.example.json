@@ -1,0 +1,98 @@
+{
+  "schema_version": "stage3.5a-config-v1",
+  "template_only": true,
+  "public_patch": "26.15",
+  "queue_id": 420,
+  "target_eligible_matches": 10000,
+  "primary_timestamps_minutes": [5, 10, 15],
+  "exploratory_timestamps_minutes": [20, 25],
+  "minimum_game_duration_seconds": 300,
+  "maximum_frame_lateness_ms": 60000,
+  "concurrency": 4,
+  "private_output_directory": "data/stage35a/private/dataset-v1",
+  "aggregate_output_directory": "config/evaluation/stage3.5a-patch26.15-v1/results",
+  "maximum_aggregate_publication_bytes": 5000000,
+  "sources": [
+    {
+      "label": "eune-external",
+      "platform": "eun1",
+      "source_kind": "external",
+      "directory": "REPLACE_WITH_EUNE_EXTERNAL_STAGE31",
+      "file_sha256": {
+        "bans.jsonl": "0000000000000000000000000000000000000000000000000000000000000000",
+        "matches.jsonl": "0000000000000000000000000000000000000000000000000000000000000000",
+        "metadata.json": "0000000000000000000000000000000000000000000000000000000000000000",
+        "participants.jsonl": "0000000000000000000000000000000000000000000000000000000000000000",
+        "quality_report.json": "0000000000000000000000000000000000000000000000000000000000000000",
+        "teams.jsonl": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "label": "eune-retained-private",
+      "platform": "eun1",
+      "source_kind": "retained_private",
+      "directory": "REPLACE_WITH_EUNE_RETAINED_STAGE31",
+      "file_sha256": {
+        "bans.jsonl": "0000000000000000000000000000000000000000000000000000000000000000",
+        "matches.jsonl": "0000000000000000000000000000000000000000000000000000000000000000",
+        "metadata.json": "0000000000000000000000000000000000000000000000000000000000000000",
+        "participants.jsonl": "0000000000000000000000000000000000000000000000000000000000000000",
+        "quality_report.json": "0000000000000000000000000000000000000000000000000000000000000000",
+        "teams.jsonl": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "label": "euw-external",
+      "platform": "euw1",
+      "source_kind": "external",
+      "directory": "REPLACE_WITH_EUW_EXTERNAL_STAGE31",
+      "file_sha256": {
+        "bans.jsonl": "0000000000000000000000000000000000000000000000000000000000000000",
+        "matches.jsonl": "0000000000000000000000000000000000000000000000000000000000000000",
+        "metadata.json": "0000000000000000000000000000000000000000000000000000000000000000",
+        "participants.jsonl": "0000000000000000000000000000000000000000000000000000000000000000",
+        "quality_report.json": "0000000000000000000000000000000000000000000000000000000000000000",
+        "teams.jsonl": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "label": "euw-retained-private",
+      "platform": "euw1",
+      "source_kind": "retained_private",
+      "directory": "REPLACE_WITH_EUW_RETAINED_STAGE31",
+      "file_sha256": {
+        "bans.jsonl": "0000000000000000000000000000000000000000000000000000000000000000",
+        "matches.jsonl": "0000000000000000000000000000000000000000000000000000000000000000",
+        "metadata.json": "0000000000000000000000000000000000000000000000000000000000000000",
+        "participants.jsonl": "0000000000000000000000000000000000000000000000000000000000000000",
+        "quality_report.json": "0000000000000000000000000000000000000000000000000000000000000000",
+        "teams.jsonl": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  ],
+  "platforms": [
+    {
+      "platform": "eun1",
+      "routing_region": "europe",
+      "raw_timeline_directory": "data/stage35a/private/eune/timelines",
+      "checkpoint_database": "data/stage35a/private/eune/timeline-checkpoint.sqlite3",
+      "maximum_requests": 7000
+    },
+    {
+      "platform": "euw1",
+      "routing_region": "europe",
+      "raw_timeline_directory": "data/stage35a/private/euw/timelines",
+      "checkpoint_database": "data/stage35a/private/euw/timeline-checkpoint.sqlite3",
+      "maximum_requests": 7000
+    }
+  ],
+  "history_policy": {
+    "recent_days": 30,
+    "exponential_decay": 0.8,
+    "shrinkage_prior_mean": 0.5,
+    "shrinkage_prior_strength": 10.0,
+    "limited_history_threshold": 5,
+    "proposed_maximum_prior_matches": 100,
+    "proposed_maximum_prior_days": 180
+  }
+}

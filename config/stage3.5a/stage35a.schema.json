@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nexus-lens.local/schemas/stage3.5a-config-v1.json",
+  "title": "Nexus Lens Stage 3.5A execution configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "template_only",
+    "public_patch",
+    "queue_id",
+    "target_eligible_matches",
+    "primary_timestamps_minutes",
+    "exploratory_timestamps_minutes",
+    "minimum_game_duration_seconds",
+    "maximum_frame_lateness_ms",
+    "concurrency",
+    "private_output_directory",
+    "aggregate_output_directory",
+    "maximum_aggregate_publication_bytes",
+    "sources",
+    "platforms",
+    "history_policy"
+  ],
+  "properties": {
+    "schema_version": {"const": "stage3.5a-config-v1"},
+    "template_only": {"type": "boolean"},
+    "public_patch": {"const": "26.15"},
+    "queue_id": {"const": 420},
+    "target_eligible_matches": {"type": "integer", "minimum": 1},
+    "primary_timestamps_minutes": {"const": [5, 10, 15]},
+    "exploratory_timestamps_minutes": {"const": [20, 25]},
+    "minimum_game_duration_seconds": {"type": "integer", "minimum": 0},
+    "maximum_frame_lateness_ms": {"type": "integer", "minimum": 0},
+    "concurrency": {"type": "integer", "minimum": 1, "maximum": 4},
+    "private_output_directory": {"type": "string", "minLength": 1},
+    "aggregate_output_directory": {"type": "string", "minLength": 1},
+    "maximum_aggregate_publication_bytes": {"type": "integer", "minimum": 1},
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "platform", "source_kind", "directory", "file_sha256"],
+        "properties": {
+          "label": {"type": "string", "minLength": 1},
+          "platform": {"enum": ["eun1", "euw1"]},
+          "source_kind": {"enum": ["external", "retained_private", "extension"]},
+          "directory": {"type": "string", "minLength": 1},
+          "file_sha256": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["bans.jsonl", "matches.jsonl", "metadata.json", "participants.jsonl", "quality_report.json", "teams.jsonl"],
+            "properties": {
+              "bans.jsonl": {"$ref": "#/$defs/sha256"},
+              "matches.jsonl": {"$ref": "#/$defs/sha256"},
+              "metadata.json": {"$ref": "#/$defs/sha256"},
+              "participants.jsonl": {"$ref": "#/$defs/sha256"},
+              "quality_report.json": {"$ref": "#/$defs/sha256"},
+              "teams.jsonl": {"$ref": "#/$defs/sha256"}
+            }
+          }
+        }
+      }
+    },
+    "platforms": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["platform", "routing_region", "raw_timeline_directory", "checkpoint_database", "maximum_requests"],
+        "properties": {
+          "platform": {"enum": ["eun1", "euw1"]},
+          "routing_region": {"const": "europe"},
+          "raw_timeline_directory": {"type": "string", "minLength": 1},
+          "checkpoint_database": {"type": "string", "minLength": 1},
+          "maximum_requests": {"type": "integer", "minimum": 1}
+        }
+      }
+    },
+    "history_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recent_days", "exponential_decay", "shrinkage_prior_mean", "shrinkage_prior_strength", "limited_history_threshold", "proposed_maximum_prior_matches", "proposed_maximum_prior_days"],
+      "properties": {
+        "recent_days": {"type": "integer", "minimum": 1},
+        "exponential_decay": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
+        "shrinkage_prior_mean": {"type": "number", "minimum": 0, "maximum": 1},
+        "shrinkage_prior_strength": {"type": "number", "exclusiveMinimum": 0},
+        "limited_history_threshold": {"type": "integer", "minimum": 0},
+        "proposed_maximum_prior_matches": {"type": "integer", "minimum": 1, "maximum": 100},
+        "proposed_maximum_prior_days": {"type": "integer", "minimum": 1}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

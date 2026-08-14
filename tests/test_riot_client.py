@@ -67,6 +67,29 @@ async def test_requests_ranked_solo_match_ids_with_pagination() -> None:
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_requests_match_timeline_from_regional_route() -> None:
+    route = respx.get(
+        "https://europe.api.riotgames.com/lol/match/v5/matches/EUW1_1/timeline"
+    ).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "metadata": {"matchId": "EUW1_1"},
+                "info": {"frames": []},
+            },
+        )
+    )
+
+    async with RiotClient(make_settings()) as client:
+        timeline = await client.get_match_timeline("EUW1_1")
+
+    assert timeline["metadata"]["matchId"] == "EUW1_1"
+    assert route.call_count == 1
+    assert client.metrics.requests_by_endpoint == {"match_timeline": 1}
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_raises_domain_error_for_riot_failure() -> None:
     respx.get(
         "https://europe.api.riotgames.com/lol/match/v5/matches/EUW1_missing"

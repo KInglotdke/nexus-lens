@@ -506,6 +506,42 @@ for the executable preflight and future publication contract. The operational
 amendment does not authorize fitting the real corpus; a future run must supply both
 `--publish` and `--authorize-real-fit` under separate authorization.
 
+## Stage 3.5A: top-lane trajectory feasibility
+
+Stage 3.5A starts a new lineage from all 10,000 sealed patch-26.15 queue-420
+matches. It collects private Match-V5 timelines, extracts focal-minus-opposing-top
+gold/XP/CS/farm/level trajectories at 5, 10, and 15 minutes, retains 20/25 minutes
+as survivor-conditioned exploratory endpoints, and measures top-outer-turret and
+event-supported intervention proxies. Each match produces two symmetric focal rows
+with weight 0.5 and one private match-group key.
+
+Familiarity is reconstructed only from strictly earlier local matches. Low history
+increases uncertainty and is not treated as low skill. The legal champion-select
+feature contract contains the focal/candidate champion, enemy top champion, legal
+context, and focal history; it contains no opponent account information or outcome.
+No Stage 3.5A command fits a predictive model or authorizes recommendations.
+
+The completed feasibility corpus adds 220 unique patch-26.15 matches per platform
+to cover technical exclusions. Of 10,440 downloaded timelines, 10,037 were eligible;
+the deterministic core contains exactly 10,000 matches and 20,000 weighted focal
+perspectives. The aggregate results are under
+`config/evaluation/stage3.5a-patch26.15-v1/results/`.
+
+The checked-in configuration is a non-executable template. Live paths, source
+hashes, credentials, timelines, checkpoints, and focal rows remain ignored/private:
+
+```powershell
+$env:PYTHONPATH='src'
+.\.venv\Scripts\python.exe scripts\collect_timelines.py `
+  --config data\stage35a\private\production-config.json --dry-run
+.\.venv\Scripts\python.exe scripts\build_stage35a.py `
+  --config data\stage35a\private\production-config.json --validate-only
+```
+
+See [docs/stage3_5a.md](docs/stage3_5a.md) for collection, labels, privacy, and
+history limitations. [docs/stage3_5b_proposal.md](docs/stage3_5b_proposal.md) is a
+prospective modelling ladder only; it has not been executed.
+
 ## Stage 2: controlled population sampling
 
 EUNE uses platform route `eun1` for League/Summoner endpoints and regional route

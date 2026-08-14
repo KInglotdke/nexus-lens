@@ -490,3 +490,34 @@ scope exclusions.
 `NEXUS_LENS_RIOT_API_KEY` environment-variable name exists. The planner does not
 load dotenv or read, serialize, or print the secret value.
 `network_requests_made` is always zero.
+
+## Stage 3.5A private focal rows (`stage3.5a-v1`)
+
+One eligible top-lane match produces exactly two private rows with one shared
+`match_group_id` and `scientific_weight=0.5`. Identity fields are the focal
+project-scoped `player_key`, platform, timestamp, team/side, focal champion, and
+enemy top champion. There is no opponent player key or other opponent-account field.
+
+`trajectory` contains focal-minus-opposing-top gold, XP, lane minions, total farm,
+and level at 5/10/15 minutes and nullable 20/25-minute endpoints. The actual selected
+frame timestamp is retained. `trajectory_changes` contains 5→10, 10→15, 15→20, and
+20→25 changes where both endpoints exist.
+
+`tower` contains the three-class 15-minute label, exact first-top-outer time,
+threshold indicators, and nullable event-attributed plate difference.
+`interventions` contains incomplete post-selection event proxies at each primary
+endpoint. `game_win` is a secondary target. `familiarity` contains strictly earlier
+focal-player support, champion use/recency, historical lane summaries, shrunk win
+rate, uncertainty, and missing/limited-history flags.
+
+## Stage 3.5A aggregate publication
+
+`audit.json` reports retention and exclusions, platform/timestamp availability,
+target distributions/correlations, champion and directional-matchup support, tower
+and win balance, intervention sensitivities, late-endpoint survivor bias, history
+coverage, and perspective symmetry. `manifest.json` records path-free configuration,
+sealed source/timeline/dataset/executable fingerprints, counts, and quality gates.
+`quality_report.json` records exact target, two-row group, total-weight, finite-value,
+feature leakage, privacy, and zero-fit checks. `feasibility_report.md` is a concise
+aggregate interpretation. None contains match IDs, player keys, names, raw paths,
+credentials, row-level observations, predictions, or model parameters.

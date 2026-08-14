@@ -100,6 +100,7 @@ class RiotClient:
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         random_source: random.Random | None = None,
         max_requests: int | None = None,
+        request_observer: Callable[[str], None] | None = None,
     ) -> None:
         self._routing_region = settings.routing_region
         self._platform_region = settings.platform_region
@@ -117,6 +118,7 @@ class RiotClient:
         self._sleep = sleep
         self._random = random_source or random.Random()
         self._max_requests = max_requests
+        self._request_observer = request_observer
         self.metrics = RequestMetrics()
 
     @property
@@ -206,6 +208,22 @@ class RiotClient:
         )
         return RiotMatch.model_validate(payload)
 
+    async def get_match_timeline(self, match_id: str) -> dict[str, Any]:
+        """Return one Match-V5 timeline payload after minimal shape validation."""
+
+        payload = await self._get(
+            self._regional_url,
+            f"/lol/match/v5/matches/{quote(match_id, safe='')}/timeline",
+            category="match_timeline",
+        )
+        if not isinstance(payload, dict):
+            raise TypeError("Riot timeline response was not an object")
+        metadata = payload.get("metadata")
+        info = payload.get("info")
+        if not isinstance(metadata, dict) or not isinstance(info, dict):
+            raise TypeError("Riot timeline response was missing required objects")
+        return payload
+
     async def _get(
         self,
         base_url: str,
@@ -225,6 +243,8 @@ class RiotClient:
                 )
             self.metrics.attempted_requests += 1
             self.metrics.requests_by_endpoint[category] += 1
+            if self._request_observer is not None:
+                self._request_observer(category)
             try:
                 response = await self._client.get(
                     f"{base_url}{path}",

@@ -34,3 +34,4 @@ data/snapshots/*
 !data/snapshots/.gitkeep
 data/canary/
 data/pilot/
+data/stage35a/
