@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nexus-lens.local/schemas/stage3.5a-rune-addendum-config-v1.json",
+  "title": "Nexus Lens Stage 3.5A rune addendum configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "template_only",
+    "public_patch",
+    "parent_dataset_path",
+    "parent_dataset_sha256",
+    "stage35a_config_path",
+    "data_dragon_version",
+    "data_dragon_locale",
+    "data_dragon_versions_path",
+    "data_dragon_versions_sha256",
+    "data_dragon_runes_path",
+    "data_dragon_runes_sha256",
+    "meaningful_support_threshold",
+    "illustrative_combination_limit",
+    "private_output_directory",
+    "aggregate_output_directory",
+    "maximum_aggregate_publication_bytes"
+  ],
+  "properties": {
+    "schema_version": {"const": "stage3.5a-rune-addendum-config-v1"},
+    "template_only": {"type": "boolean"},
+    "public_patch": {"const": "26.15"},
+    "parent_dataset_path": {"type": "string", "minLength": 1},
+    "parent_dataset_sha256": {"$ref": "#/$defs/sha256"},
+    "stage35a_config_path": {"type": "string", "minLength": 1},
+    "data_dragon_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "data_dragon_locale": {"const": "en_US"},
+    "data_dragon_versions_path": {"type": "string", "minLength": 1},
+    "data_dragon_versions_sha256": {"$ref": "#/$defs/sha256"},
+    "data_dragon_runes_path": {"type": "string", "minLength": 1},
+    "data_dragon_runes_sha256": {"$ref": "#/$defs/sha256"},
+    "meaningful_support_threshold": {"const": 20},
+    "illustrative_combination_limit": {"type": "integer", "minimum": 1, "maximum": 25},
+    "private_output_directory": {"type": "string", "minLength": 1},
+    "aggregate_output_directory": {"type": "string", "minLength": 1},
+    "maximum_aggregate_publication_bytes": {"type": "integer", "minimum": 1}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

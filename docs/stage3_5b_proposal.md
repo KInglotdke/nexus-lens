@@ -21,14 +21,22 @@ the primary usefulness decision.
 
 ## Candidate ladder
 
-For every continuous endpoint, compare:
+For every continuous endpoint, compare the following prospective ladder on the
+same rows and chronological folds:
 
 1. Global training mean.
 2. Training-only own-champion mean with frozen shrinkage/backoff.
 3. Additive own-champion plus enemy-champion Ridge regression.
 4. Regularized directional matchup-pair Ridge regression.
-5. Elastic Net matchup regression.
-6. CatBoost regression challenger.
+5. Matchup Ridge plus a regularized focal-keystone main effect.
+6. Matchup Ridge plus a regularized focal-champion by focal-keystone interaction,
+   only if its minimum-support and shrinkage policy is frozen prospectively.
+7. Elastic Net versions where scientifically justified, using the same legal
+   feature scopes and comparisons.
+8. A CatBoost challenger using focal champion, enemy champion, focal keystone, and
+   other already authorized champion-select features.
+9. Existing secondary tower and game-win models, without allowing win to redefine
+   lane success.
 
 For the tower label compare a regularized multinomial logistic model and a CatBoost
 classifier against training-only global-majority/probability baselines. A separate
@@ -42,6 +50,26 @@ strictly earlier focal-player fields from Stage 3.5A. No opponent account field 
 permitted. A later trajectory model may add timestamp and timestamp-interaction
 terms using the repeated observations nested under match group. A neural network is
 not a first-line candidate.
+
+The outcome-blind rune audit found complete keystone coverage, but highly uneven
+interaction support. A focal-keystone main effect is therefore a candidate;
+champion-keystone interactions require regularization and fallback. The full focal
+champion by enemy champion by keystone interaction is not a primary candidate:
+7,518 observed directional groups have median support 1, maximum support 44, and no
+group reaches 50 focal rows. If examined at all, it is exploratory and requires
+hierarchical shrinkage or fallback.
+
+The prospective rune fallback hierarchy is:
+
+1. Supported matchup-specific rune evidence, if a later frozen protocol justifies
+   it.
+2. Champion-keystone effect plus champion-matchup effect.
+3. General keystone effect plus additive champion effects.
+4. Champion-only or global fallback.
+
+The 10-minute gold and XP endpoints remain co-primary. A rune candidate must add
+out-of-time value over the same matchup model without rune features. The final
+holdout cannot be used for rune-feature selection.
 
 ## Evaluation contract to freeze
 
@@ -92,3 +120,7 @@ Before Stage 3.5B execution, prospectively freeze:
 
 Stage 3.5A aggregate feasibility results may inform whether these designs are
 supportable, but no candidate result may be calculated before the protocol freeze.
+Rune choice is observational and potentially influenced by opponent, playstyle,
+familiarity, skill, intended strategy, and external advice. Initial Stage 3.5B
+language must therefore remain "rune-conditioned expected lane performance" rather
+than claim that switching a rune causes an outcome change.

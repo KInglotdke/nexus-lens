@@ -1,0 +1,19 @@
+{
+  "schema_version": "stage3.5a-rune-addendum-config-v1",
+  "template_only": true,
+  "public_patch": "26.15",
+  "parent_dataset_path": "data/stage35a/private/dataset-v1/focal_perspectives.jsonl",
+  "parent_dataset_sha256": "91dd6f0130dbc47734089b067e55b0b75350228205390a0458a1f4b67b9868b6",
+  "stage35a_config_path": "data/stage35a/private/production-config.json",
+  "data_dragon_version": "16.15.1",
+  "data_dragon_locale": "en_US",
+  "data_dragon_versions_path": "data/stage35a/private/static-data/16.15.1/versions.json",
+  "data_dragon_versions_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "data_dragon_runes_path": "data/stage35a/private/static-data/16.15.1/runesReforged.json",
+  "data_dragon_runes_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "meaningful_support_threshold": 20,
+  "illustrative_combination_limit": 15,
+  "private_output_directory": "data/stage35a/private/rune-addendum-v1",
+  "aggregate_output_directory": "config/evaluation/stage3.5a-rune-addendum-patch26.15-v1/results",
+  "maximum_aggregate_publication_bytes": 2000000
+}

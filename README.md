@@ -542,6 +542,15 @@ See [docs/stage3_5a.md](docs/stage3_5a.md) for collection, labels, privacy, and
 history limitations. [docs/stage3_5b_proposal.md](docs/stage3_5b_proposal.md) is a
 prospective modelling ladder only; it has not been executed.
 
+The separate Stage 3.5A rune-feasibility addendum maps only each focal
+participant's own patch-correct keystone and rune-tree IDs onto the unchanged
+20,000-row parent. Its outcome-blind audit found complete keystone coverage while
+confirming that three-way champion/matchup/keystone groups are too sparse for a
+primary unregularized feature. Private derived rows remain outside Git; only the
+aggregate support audit and deterministic lineage manifest are published. No rune
+outcome comparison or model fit was performed. See
+[docs/stage3_5a_runes.md](docs/stage3_5a_runes.md).
+
 ## Stage 2: controlled population sampling
 
 EUNE uses platform route `eun1` for League/Summoner endpoints and regional route

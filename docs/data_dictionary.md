@@ -521,3 +521,25 @@ sealed source/timeline/dataset/executable fingerprints, counts, and quality gate
 feature leakage, privacy, and zero-fit checks. `feasibility_report.md` is a concise
 aggregate interpretation. None contains match IDs, player keys, names, raw paths,
 credentials, row-level observations, predictions, or model parameters.
+
+## Stage 3.5A private rune addendum (`stage3.5a-rune-features-v1`)
+
+The addendum contains exactly one derived row for each parent focal row, in unchanged
+order. `parent_row_index` and `parent_row_sha256` provide deterministic linkage
+without copying any target. `focal_row_key` is a private project-scoped row digest.
+`match_group_id` and `scientific_weight` are unchanged from the parent.
+
+Allowed rune fields are `focal_keystone_id`, `focal_keystone_name`,
+`focal_primary_tree_id`, `focal_secondary_tree_id`, and `mapping_status`. Nullable
+tree fields require an explicit status; valid primary keystones are not discarded
+merely because a secondary tree is unavailable. The schema has no opponent rune,
+minor rune, stat shard, complete page, target, outcome, player identifier, or raw
+match identifier field.
+
+The private support-details artifact retains complete champion-keystone and
+directional matchup-keystone counts without outcomes. Public `audit.json` publishes
+only aggregate distributions, threshold counts, a bounded illustrative table,
+platform/chronology coverage, and scientific limitations. `manifest.json` records
+the parent, derived, rune-map, executable, retained-source, and static-data
+fingerprints. `quality_report.json` enforces alignment, grouping, weights, privacy,
+finite-or-explicit-null values, outcome blindness, and zero predictive fits.

@@ -514,3 +514,20 @@ Private row data and raw timelines remain outside Git. Atomic aggregate publicat
 contains only distributions, counts, support summaries, correlations, fingerprints,
 quality gates, and limitations. Future chronological folds and bootstraps must use
 the private match group rather than the two perspective rows.
+
+## Stage 3.5A rune addendum lineage
+
+The rune addendum derives a new private table from the immutable Stage 3.5A focal
+rows and the retained Match-V5 payloads; it does not replace the parent dataset.
+Each parent row is linked by its original order and full-row hash. The derived row
+retains the same match-group key and 0.5 weight, then adds only the focal
+participant's keystone ID/name, primary/secondary tree IDs, and mapping status.
+Targets are neither copied nor inspected for support calculations. Opponent rune
+data are structurally absent.
+
+Patch identity follows the repository public-to-API patch map and an exact official
+Data Dragon revision. Rune-tree membership identifies the keystone semantically;
+unknown, conflicting, or incomplete mappings remain explicit rather than changing
+eligibility. The public output contains aggregate support distributions and
+path-free fingerprints only. Full derived rows and combination tables remain
+private. No component imports or invokes a predictive modelling stage.
