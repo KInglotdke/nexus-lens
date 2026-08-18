@@ -543,3 +543,17 @@ platform/chronology coverage, and scientific limitations. `manifest.json` record
 the parent, derived, rune-map, executable, retained-source, and static-data
 fingerprints. `quality_report.json` enforces alignment, grouping, weights, privacy,
 finite-or-explicit-null values, outcome blindness, and zero predictive fits.
+
+## Stage 3.5B private OOF rows (`stage3.5b-private-oof-row-v1`)
+
+Each development-evaluation focal row retains its private parent row index and match
+group, platform/side/block/support strata, continuous and categorical targets, and
+OOF predictions for the frozen candidates. This table exists only outside Git.
+Rows from the final temporal holdout are absent.
+
+The public Stage 3.5B bundle contains `development_results.json`, aggregate paired
+comparisons, mechanical gate decisions, reconciled operation counts, a path-free
+input manifest, quality report, concise report, and bundle manifest. It contains no
+row-level prediction, match/player identity, source path, model coefficient, or
+future-holdout result. Undefined metrics are JSON null; NaN and infinity fail
+publication.

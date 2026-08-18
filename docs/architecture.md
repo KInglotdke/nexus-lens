@@ -531,3 +531,17 @@ unknown, conflicting, or incomplete mappings remain explicit rather than changin
 eligibility. The public output contains aggregate support distributions and
 path-free fingerprints only. Full derived rows and combination tables remain
 private. No component imports or invokes a predictive modelling stage.
+
+## Stage 3.5B rolling-origin development
+
+Stage 3.5B joins the immutable focal table to its rune addendum by row index,
+parent-row hash, group, and weight. It partitions only at match-group timestamps;
+both focal perspectives remain together. The newest frozen holdout is recognized
+before target projection and excluded from development feature and outcome objects.
+
+Each outer training fold independently learns category support, rare-keystone
+fallbacks, one-hot vocabularies, and native CatBoost categorical state. Inner
+selection is chronological and limited to the outer training period. OOF arrays are
+retained only in the private output; aggregate metrics and match-group paired
+bootstrap summaries are published atomically after every operation and privacy gate
+reconciles. The bootstrap never refits a model.

@@ -1,0 +1,11 @@
+{
+  "schema_version": "stage3.5b-execution-config-v1",
+  "template_only": true,
+  "parent_dataset_path": "data/stage35a/private/dataset-v1/focal_perspectives.jsonl",
+  "rune_dataset_path": "data/stage35a/private/rune-addendum-v1/focal_rune_features.jsonl",
+  "rune_manifest_path": "config/evaluation/stage3.5a-rune-addendum-patch26.15-v1/results/manifest.json",
+  "stage34b_bundle_manifest_path": "config/evaluation/stage3.4b-1-patch26.15-protocol-v2/development-v1/bundle_manifest.json",
+  "private_output_directory": "data/stage35b/private/development-v1",
+  "aggregate_output_directory": "config/evaluation/stage3.5b-patch26.15-protocol-v1/development-v1",
+  "maximum_publication_bytes": 5000000
+}

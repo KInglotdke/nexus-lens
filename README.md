@@ -551,6 +551,23 @@ aggregate support audit and deterministic lineage manifest are published. No run
 outcome comparison or model fit was performed. See
 [docs/stage3_5a_runes.md](docs/stage3_5a_runes.md).
 
+## Stage 3.5B: frozen top-lane development protocol
+
+Stage 3.5B prospectively freezes an offline rolling-origin comparison of analytic
+champion baselines, additive and directional-matchup Ridge models, focal-keystone
+and champion-keystone extensions, Elastic Net counterparts, and an ordered
+categorical CatBoost challenger. Gold and XP differences at 10 minutes remain
+separate co-primary outcomes. Every complexity increase is paired against its
+immediate scientific comparator using match-group OOF predictions.
+
+The protocol uses four development blocks and excludes the newest 650 match groups
+as a final temporal holdout. Its exact budget is 828 training operations—128
+analytic estimates and 700 optimizer fits—with zero bootstrap model fits. Platform
+is a reporting stratum only; focal history, opponent accounts/runes, identifiers,
+rank, and post-selection signals are forbidden predictors. See
+[docs/stage3_5b.md](docs/stage3_5b.md). Passing a development gate would authorize
+only a separately reviewed final-holdout hypothesis, never a product recommendation.
+
 ## Stage 2: controlled population sampling
 
 EUNE uses platform route `eun1` for League/Summoner endpoints and regional route

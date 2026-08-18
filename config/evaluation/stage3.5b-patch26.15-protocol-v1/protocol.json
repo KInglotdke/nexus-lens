@@ -1,0 +1,175 @@
+{
+  "schema_version": "stage3.5b-protocol-v1",
+  "protocol_id": "stage3.5b-patch26.15-rolling-development-v1",
+  "status": "prospectively_frozen_before_real_model_fitting",
+  "data_scope": {
+    "public_patch": "26.15",
+    "queue_id": 420,
+    "parent_dataset_sha256": "91dd6f0130dbc47734089b067e55b0b75350228205390a0458a1f4b67b9868b6",
+    "rune_dataset_sha256": "e91dcf4bbfafdcd74aa81cba89e6392b1100d534c2ea502b01dc06bed849d772",
+    "rune_mapping_sha256": "c7133dd5d9367b43ea4134a8281c995a9064aecfc1aa03a9af6a86c03f8e6dac",
+    "rune_executable_bundle_sha256": "4ee9692a3881070df8ed8995798f5a991dbcd5e53596f5e2e545c689364d3b5e",
+    "stage34b_scientific_bundle_sha256": "577b151d377e0df3f976f67065be6f852e33a8cca2286424b36a3de8e4b47dcc",
+    "expected_focal_rows": 20000,
+    "expected_match_groups": 10000
+  },
+  "questions": [
+    "focal_champion_value",
+    "enemy_champion_increment",
+    "directional_matchup_increment",
+    "focal_keystone_increment",
+    "champion_keystone_interaction_increment",
+    "catboost_nonlinear_increment"
+  ],
+  "outcomes": {
+    "co_primary": ["gold_difference_10", "xp_difference_10"],
+    "continuous_secondary": [
+      "gold_difference_5", "xp_difference_5",
+      "gold_difference_15", "xp_difference_15",
+      "lane_minion_cs_difference_5", "lane_minion_cs_difference_10", "lane_minion_cs_difference_15",
+      "total_farm_difference_5", "total_farm_difference_10", "total_farm_difference_15",
+      "level_difference_5", "level_difference_10", "level_difference_15"
+    ],
+    "categorical_secondary": ["tower_outcome_15", "game_win"],
+    "primary_metric": "match_weighted_mae"
+  },
+  "features": {
+    "allowed": [
+      "focal_champion", "enemy_top_champion", "directional_matchup_pair",
+      "focal_keystone", "focal_champion_by_focal_keystone", "side"
+    ],
+    "forbidden": [
+      "opponent_account", "opponent_history", "opponent_rank", "opponent_mastery",
+      "opponent_familiarity", "opponent_keystone", "opponent_rune_page",
+      "focal_history", "focal_familiarity", "minor_runes", "stat_shards",
+      "complete_rune_page", "intervention_proxies", "post_selection_events",
+      "match_duration", "final_win_as_input", "player_identifier", "match_identifier",
+      "external_identifier", "platform_as_predictor", "historical_backfill"
+    ],
+    "rare_keystone_minimum_training_rows": 20,
+    "champion_mean_minimum_training_rows": 10,
+    "unknown_category_policy": "zero_unsupported_interaction_and_retain_lower_level_effects",
+    "platform_predictive_feature": false,
+    "rank_predictive_feature": false,
+    "history_predictive_feature": false
+  },
+  "folds": {
+    "initial_training_end_exclusive_utc": "2026-08-03T00:00:00Z",
+    "outer_blocks": [
+      {"id": "outer-0", "start_utc": "2026-08-03T00:00:00Z", "end_utc": "2026-08-05T00:00:00Z", "expected_groups": 1342},
+      {"id": "outer-1", "start_utc": "2026-08-05T00:00:00Z", "end_utc": "2026-08-07T00:00:00Z", "expected_groups": 1844},
+      {"id": "outer-2", "start_utc": "2026-08-07T00:00:00Z", "end_utc": "2026-08-09T00:00:00Z", "expected_groups": 1980},
+      {"id": "outer-3", "start_utc": "2026-08-09T00:00:00Z", "end_utc": "2026-08-10T00:00:00Z", "expected_groups": 999}
+    ],
+    "expected_initial_training_groups": 3185,
+    "expected_development_evaluation_groups": 6165,
+    "final_holdout_start_utc": "2026-08-10T00:00:00Z",
+    "expected_final_holdout_groups": 650,
+    "inner_validation_hours": 24,
+    "group_unit": "match_group_id",
+    "training_strictly_precedes_validation": true,
+    "require_both_platforms": true,
+    "final_holdout_targets_accessed": false
+  },
+  "candidates": {
+    "analytic": ["global_mean", "focal_champion_mean"],
+    "linear": [
+      {"id": "additive_ridge", "estimator": "ridge", "features": ["focal_champion", "enemy_top_champion", "side"]},
+      {"id": "matchup_ridge", "estimator": "ridge", "features": ["focal_champion", "enemy_top_champion", "side", "directional_matchup_pair"]},
+      {"id": "matchup_keystone_ridge", "estimator": "ridge", "features": ["focal_champion", "enemy_top_champion", "side", "directional_matchup_pair", "focal_keystone"]},
+      {"id": "champion_keystone_ridge", "estimator": "ridge", "features": ["focal_champion", "enemy_top_champion", "side", "directional_matchup_pair", "focal_keystone", "focal_champion_by_focal_keystone"]},
+      {"id": "additive_elastic_net", "estimator": "elastic_net", "features": ["focal_champion", "enemy_top_champion", "side"]},
+      {"id": "matchup_elastic_net", "estimator": "elastic_net", "features": ["focal_champion", "enemy_top_champion", "side", "directional_matchup_pair"]},
+      {"id": "matchup_keystone_elastic_net", "estimator": "elastic_net", "features": ["focal_champion", "enemy_top_champion", "side", "directional_matchup_pair", "focal_keystone"]},
+      {"id": "champion_keystone_elastic_net", "estimator": "elastic_net", "features": ["focal_champion", "enemy_top_champion", "side", "directional_matchup_pair", "focal_keystone", "focal_champion_by_focal_keystone"]}
+    ],
+    "nonlinear": [{"id": "catboost", "features": ["focal_champion", "enemy_top_champion", "side", "focal_keystone"]}],
+    "three_way_matchup_keystone_primary_candidate": false,
+    "hierarchical_interactions": true
+  },
+  "hyperparameters": {
+    "seed": 35501,
+    "software_versions": {
+      "python": "3.12",
+      "numpy": "2.5.1",
+      "scipy": "1.18.0",
+      "scikit_learn": "1.9.0",
+      "catboost": "1.2.10"
+    },
+    "selection": "minimum_mean_normalized_inner_mae_across_co_primary_targets",
+    "tie_break": "lexicographically_smallest_configuration_id_within_1e-12",
+    "ridge_grid": [
+      {"id": "ridge-alpha-1", "alpha": 1.0},
+      {"id": "ridge-alpha-10", "alpha": 10.0}
+    ],
+    "elastic_net_grid": [
+      {"id": "elastic-alpha-0.01-l1-0.1", "alpha": 0.01, "l1_ratio": 0.1},
+      {"id": "elastic-alpha-0.1-l1-0.25", "alpha": 0.1, "l1_ratio": 0.25}
+    ],
+    "elastic_net_max_iterations": 5000,
+    "elastic_net_tolerance": 0.0001,
+    "elastic_net_selection": "cyclic",
+    "ridge_solver": "lsqr",
+    "one_hot_unknown_policy": "ignore_zero_contribution",
+    "catboost_grid": [
+      {"id": "cat-depth-4", "depth": 4, "learning_rate": 0.05, "iterations": 150, "l2_leaf_reg": 3.0},
+      {"id": "cat-depth-6", "depth": 6, "learning_rate": 0.04, "iterations": 200, "l2_leaf_reg": 5.0}
+    ],
+    "catboost_bootstrap_type": "Bayesian",
+    "catboost_boosting_type": "Ordered",
+    "catboost_thread_count": 1,
+    "secondary_logistic_c": 1.0,
+    "secondary_logistic_max_iterations": 1000,
+    "secondary_logistic_tolerance": 0.000001,
+    "early_stopping": false,
+    "preprocessing_fit_scope": "training_fold_only"
+  },
+  "metrics": {
+    "continuous": ["mae", "rmse", "r2", "sign_accuracy", "coverage"],
+    "tower": ["log_loss", "multiclass_brier", "expected_calibration_error", "class_coverage"],
+    "game_win": ["log_loss", "brier", "expected_calibration_error", "class_coverage"],
+    "slices": ["platform", "outer_block", "side", "training_support_tier"],
+    "bootstrap_replicates": 2000,
+    "bootstrap_seed": 35521,
+    "bootstrap_unit": "match_group_id",
+    "bootstrap_strata": ["platform", "outer_block"],
+    "bootstrap_model_fits": 0,
+    "confidence_level": 0.95
+  },
+  "comparisons": [
+    ["focal_champion_mean", "global_mean"],
+    ["additive_ridge", "focal_champion_mean"],
+    ["matchup_ridge", "additive_ridge"],
+    ["matchup_keystone_ridge", "matchup_ridge"],
+    ["champion_keystone_ridge", "matchup_keystone_ridge"],
+    ["additive_elastic_net", "additive_ridge"],
+    ["matchup_elastic_net", "matchup_ridge"],
+    ["matchup_keystone_elastic_net", "matchup_keystone_ridge"],
+    ["champion_keystone_elastic_net", "champion_keystone_ridge"]
+  ],
+  "gates": {
+    "confidence_interval_upper_below_zero": true,
+    "both_co_primary_outcomes_required": true,
+    "both_platform_directions_favourable": true,
+    "minimum_favourable_chronological_blocks": 3,
+    "complete_prediction_coverage": true,
+    "secondary_outcomes_cannot_rescue": true,
+    "development_gate_is_not_deployment_authorization": true
+  },
+  "operation_budget": {
+    "analytic_training_operations": 128,
+    "optimizer_fits": 700,
+    "total_training_operations": 828,
+    "bootstrap_model_fits": 0,
+    "bootstrap_comparison_evaluations": 154
+  },
+  "privacy": {
+    "aggregate_only_publication": true,
+    "row_level_predictions_private": true,
+    "identifiers_published": false,
+    "external_paths_published": false,
+    "coefficients_published": false,
+    "rune_claim": "rune-conditioned expected lane performance",
+    "causal_rune_switch_claim_authorized": false
+  }
+}

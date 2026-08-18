@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nexus-lens.local/schemas/stage3.5b-execution-config-v1.json",
+  "title": "Nexus Lens Stage 3.5B execution configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "template_only", "parent_dataset_path", "rune_dataset_path",
+    "rune_manifest_path", "stage34b_bundle_manifest_path", "private_output_directory",
+    "aggregate_output_directory", "maximum_publication_bytes"
+  ],
+  "properties": {
+    "schema_version": {"const": "stage3.5b-execution-config-v1"},
+    "template_only": {"type": "boolean"},
+    "parent_dataset_path": {"type": "string", "minLength": 1},
+    "rune_dataset_path": {"type": "string", "minLength": 1},
+    "rune_manifest_path": {"type": "string", "minLength": 1},
+    "stage34b_bundle_manifest_path": {"type": "string", "minLength": 1},
+    "private_output_directory": {"type": "string", "minLength": 1},
+    "aggregate_output_directory": {"type": "string", "minLength": 1},
+    "maximum_publication_bytes": {"const": 5000000}
+  }
+}

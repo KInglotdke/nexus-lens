@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nexus-lens.local/schemas/stage3.5b-protocol-v1.json",
+  "title": "Nexus Lens Stage 3.5B frozen rolling-origin protocol",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "protocol_id", "status", "data_scope", "questions",
+    "outcomes", "features", "folds", "candidates", "hyperparameters",
+    "metrics", "comparisons", "gates", "operation_budget", "privacy"
+  ],
+  "properties": {
+    "schema_version": {"const": "stage3.5b-protocol-v1"},
+    "protocol_id": {"const": "stage3.5b-patch26.15-rolling-development-v1"},
+    "status": {"const": "prospectively_frozen_before_real_model_fitting"},
+    "data_scope": {"type": "object"},
+    "questions": {"type": "array", "minItems": 6, "maxItems": 6},
+    "outcomes": {"type": "object"},
+    "features": {"type": "object"},
+    "folds": {"type": "object"},
+    "candidates": {"type": "object"},
+    "hyperparameters": {"type": "object"},
+    "metrics": {"type": "object"},
+    "comparisons": {"type": "array", "minItems": 9, "maxItems": 9},
+    "gates": {"type": "object"},
+    "operation_budget": {"type": "object"},
+    "privacy": {"type": "object"}
+  }
+}
