@@ -568,6 +568,15 @@ rank, and post-selection signals are forbidden predictors. See
 [docs/stage3_5b.md](docs/stage3_5b.md). Passing a development gate would authorize
 only a separately reviewed final-holdout hypothesis, never a product recommendation.
 
+The single frozen development execution completed at protocol commit
+`862151531d71ed1ca9c05f9ac5852dc6903c3624`. All 828 training operations
+reconciled, the bootstrap performed zero fits, and all four complexity gates
+failed. The simpler additive Ridge structure is therefore the only structure
+eligible for a separately authorized final-holdout evaluation. These are
+patch-26.15 development estimates, not final-test results, and they authorize no
+product, matchup, or rune recommendation. See
+[the Stage 3.5B results checkpoint](docs/stage3_5b_results.md).
+
 ## Stage 2: controlled population sampling
 
 EUNE uses platform route `eun1` for League/Summoner endpoints and regional route

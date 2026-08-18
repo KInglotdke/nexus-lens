@@ -110,3 +110,13 @@ scientific result directory. Row-level OOF predictions remain private. Public fi
 contain only aggregate metrics, comparisons, gates, operation counts, and path-free
 fingerprints; they contain no match/player identifier, external path, prediction
 row, or coefficient.
+
+## Frozen development checkpoint
+
+The one authorized development execution completed from protocol commit
+`862151531d71ed1ca9c05f9ac5852dc6903c3624`. It reconciled 128 analytic
+operations and 700 optimizer fits, with no retry, failure, or bootstrap fit. All
+four usefulness gates failed, so only the additive Ridge structure remains
+eligible for a separately authorized final-holdout evaluation. No holdout score or
+product recommendation was produced. The aggregate checkpoint and interpretation
+are documented in [stage3_5b_results.md](stage3_5b_results.md).
